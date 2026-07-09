@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SQL Server Online Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0F1416;
+    --surface: #161D20;
+    --surface-2: #1D262A;
+    --line: #26323700;
+    --line-soft: #263237;
+    --text: #DCE4E6;
+    --text-dim: #7E9096;
+    --text-faint: #4E5D62;
+    --accent: #D9A441;      /* ledger amber — ink stamp */
+    --accent-soft: rgba(217,164,65,0.12);
+    --teal: #4FA69A;        /* row/result accent */
+    --teal-soft: rgba(79,166,154,0.12);
+    --error: #C9604C;
+    --error-soft: rgba(201,96,76,0.12);
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- Header / ledger stamp ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; border-bottom:1px solid var(--line-soft);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(255,255,255,0.02) 39px 40px),
+      var(--surface);
+    flex-shrink:0;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand .mark{
+    width:30px;height:30px; border:1.5px solid var(--accent); border-radius:3px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-weight:700; color:var(--accent); font-size:14px;
+    transform: rotate(-2deg);
+  }
+  .brand h1{ font-size:15px; margin:0; font-weight:600; letter-spacing:0.02em; }
+  .brand .sub{ font-family:var(--mono); font-size:10.5px; color:var(--text-faint); letter-spacing:0.06em; text-transform:uppercase; margin-top:1px;}
+  .header-actions{ display:flex; gap:8px; align-items:center; }
+
+  button{
+    font-family:var(--sans); cursor:pointer; border-radius:4px; border:1px solid var(--line-soft);
+    background:var(--surface-2); color:var(--text); font-size:12.5px; padding:7px 12px;
+    display:flex; align-items:center; gap:6px; font-weight:500; transition:border-color .15s, background .15s;
+  }
+  button:hover{ border-color:var(--text-faint); }
+  button.primary{ background:var(--accent); color:#1B140A; border-color:var(--accent); font-weight:600; }
+  button.primary:hover{ background:#e6b559; }
+  button.ghost{ background:transparent; }
+  button:active{ transform: translateY(1px); }
+  button svg{ width:13px; height:13px; flex-shrink:0; }
+  .menu-toggle{ display:none; padding:6px; }
+  .toolbar-divider{ width:1px; height:18px; background:var(--line-soft); margin:0 2px; flex-shrink:0; }
+
+  /* ---------- Layout ---------- */
+  .shell{ flex:1; display:flex; min-height:0; }
+
+  /* Sidebar: schema ledger */
+  .sidebar{
+    width:230px; flex-shrink:0; background:var(--surface);
+    border-right:1px solid var(--line-soft);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .sidebar-head{
+    padding:12px 14px 8px; font-family:var(--mono); font-size:10.5px;
+    color:var(--text-faint); text-transform:uppercase; letter-spacing:0.08em;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .table-list{ overflow-y:auto; flex:1; padding:0 6px 10px;}
+  .table-item{ margin-bottom:2px; }
+  .table-item summary{
+    list-style:none; cursor:pointer; padding:7px 8px; border-radius:4px;
+    font-family:var(--mono); font-size:12.5px; color:var(--text);
+    display:flex; align-items:center; gap:7px; user-select:none;
+  }
+  .table-item summary::-webkit-details-marker{ display:none; }
+  .table-item summary:hover{ background:var(--surface-2); }
+  .table-item summary .chevron{ width:9px; height:9px; transition:transform .15s; color:var(--text-faint); flex-shrink:0;}
+  .table-item[open] summary .chevron{ transform:rotate(90deg); }
+  .table-item summary .n{ color:var(--teal); }
+  .table-item .cols{ padding:2px 0 6px 26px; }
+  .col-row{
+    font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+    padding:3px 6px; display:flex; justify-content:space-between; align-items:center; gap:6px; border-radius:3px;
+  }
+  .col-row:hover{ background:var(--surface-2); color:var(--text); }
+  .col-row .col-left{ display:flex; align-items:center; gap:5px; min-width:0; }
+  .col-row .col-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .col-row .type{ color:var(--text-faint); font-size:10.5px; white-space:nowrap; flex-shrink:0; }
+  .badge{
+    font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:0.03em;
+    padding:1px 4px; border-radius:3px; flex-shrink:0; line-height:1.4;
+  }
+  .badge-pk{ background:rgba(217,164,65,0.16); color:var(--accent); }
+  .badge-unique{ background:var(--teal-soft); color:var(--teal); }
+  .badge-notnull{ background:rgba(126,144,150,0.16); color:var(--text-dim); }
+  .table-item summary{ position:relative; }
+  .table-export-btn{
+    margin-left:auto; opacity:0; width:18px; height:18px; flex-shrink:0; color:var(--text-faint);
+    display:flex; align-items:center; justify-content:center; border-radius:3px;
+  }
+  .table-item summary:hover .table-export-btn{ opacity:1; }
+  .table-export-btn:hover{ color:var(--teal); background:var(--surface); }
+  .table-export-btn svg{ width:12px; height:12px; }
+  .row-count{ font-family:var(--mono); font-size:10px; color:var(--text-faint); padding:0 8px 8px 26px; }
+
+  .sidebar-foot{
+    border-top:1px solid var(--line-soft); padding:10px 14px;
+    font-family:var(--mono); font-size:10.5px; color:var(--text-faint);
+  }
+  .sidebar-foot code{ color:var(--teal); }
+
+  .sidebar-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:19;
+  }
+
+  /* Main column */
+  .main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  .toolbar{
+    display:flex; align-items:stretch; gap:8px; padding:10px 16px;
+    border-bottom:1px solid var(--line-soft); background:var(--bg); flex-shrink:0;
+  }
+  .toolbar-scroll{ display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; }
+  .toolbar-scroll::-webkit-scrollbar{ display:none; }
+  .toolbar .hint{ margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text-faint); flex-shrink:0; padding-left:10px; }
+  .toolbar .hint kbd{
+    background:var(--surface-2); border:1px solid var(--line-soft); border-radius:3px;
+    padding:1px 5px; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+  }
+
+  .editor-wrap{ flex-shrink:0; position:relative; border-bottom:1px solid var(--line-soft); }
+  .resize-handle{
+    height:10px; margin-top:-10px; position:relative; cursor:ns-resize; z-index:2;
+    display:flex; align-items:center; justify-content:center; touch-action:none;
+  }
+  .resize-handle span{ width:32px; height:3px; border-radius:2px; background:var(--line-soft); }
+  .resize-handle:hover span, .resize-handle.dragging span{ background:var(--teal); }
+  .CodeMirror{ height:180px; font-family:var(--mono); font-size:13.5px; background:var(--bg); padding:10px 0; line-height:1.55; }
+  .CodeMirror-gutters{ background:var(--bg); border-right:1px solid var(--line-soft); }
+  .CodeMirror-linenumber{ color:var(--text-faint); }
+
+  /* Results area */
+  .results-panel{ flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .results-bar{
+    display:flex; align-items:center; gap:10px; padding:9px 16px; flex-wrap:wrap;
+    border-bottom:1px solid var(--line-soft); flex-shrink:0;
+  }
+  .results-bar .status{ font-family:var(--mono); font-size:11.5px; color:var(--text-dim); }
+  .results-bar .status.ok{ color:var(--teal); }
+  .results-bar .status.err{ color:var(--error); }
+  .results-bar .meta{ font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin-left:auto; }
+
+  .result-tabs{ display:flex; gap:4px; }
+  .result-tab{
+    font-family:var(--mono); font-size:11px; padding:4px 9px; border-radius:4px;
+    color:var(--text-dim); cursor:pointer; border:1px solid transparent;
+  }
+  .result-tab:hover{ background:var(--surface-2); }
+  .result-tab.active{ background:var(--teal-soft); color:var(--teal); border-color:rgba(79,166,154,0.35); }
+
+  #filterInput{
+    font-family:var(--mono); font-size:11.5px; background:var(--surface-2); color:var(--text);
+    border:1px solid var(--line-soft); border-radius:4px; padding:5px 9px; width:160px; max-width:100%;
+  }
+  #filterInput:focus{ outline:none; border-color:var(--teal); }
+  #filterInput::placeholder{ color:var(--text-faint); }
+
+  button[disabled]{ opacity:0.45; cursor:not-allowed; }
+  button[disabled]:hover{ border-color:var(--line-soft); }
+
+  table.grid thead th{ cursor:pointer; user-select:none; }
+  table.grid thead th .sort-arrow{ color:var(--accent); margin-left:4px; font-size:10px; }
+  .row-cap-notice{
+    font-family:var(--mono); font-size:11px; color:var(--text-faint); padding:8px 14px;
+    border-top:1px solid var(--line-soft);
+  }
+
+  .results-body{ flex:1; overflow:auto; padding:0; }
+  .error-box{
+    margin:16px; padding:12px 14px; background:var(--error-soft); border:1px solid rgba(201,96,76,0.35);
+    border-radius:5px; font-family:var(--mono); font-size:12.5px; color:#E8A99A; white-space:pre-wrap;
+  }
+  .empty-state{
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--text-faint); gap:8px; padding:30px;
+  }
+  .empty-state .glyph{ font-family:var(--mono); font-size:26px; color:var(--text-faint); opacity:.6; }
+  .empty-state p{ font-size:12.5px; max-width:320px; text-align:center; margin:0; line-height:1.5; }
+
+  table.grid{ border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12.5px; }
+  table.grid thead th{
+    position:sticky; top:0; background:var(--surface); color:var(--teal);
+    text-align:left; padding:8px 14px; border-bottom:1px solid var(--line-soft);
+    font-weight:600; white-space:nowrap; z-index:1;
+  }
+  table.grid tbody td{
+    padding:6px 14px; border-bottom:1px solid rgba(38,50,55,0.5); white-space:nowrap; color:var(--text);
+  }
+  table.grid tbody tr:hover{ background:var(--surface-2); }
+  table.grid tbody td.null{ color:var(--text-faint); font-style:italic; }
+  table.grid tbody td.rownum{ color:var(--text-faint); text-align:right; }
+  table.grid thead th.rownum{ width:1%; }
+  @keyframes rowIn{ from{ opacity:0; transform:translateY(2px); } to{ opacity:1; transform:none; } }
+  table.grid tbody tr{ animation: rowIn .18s ease both; }
+
+  /* History drawer */
+  .history-drawer{
+    flex-shrink:0; border-top:1px solid var(--line-soft); background:var(--surface);
+    max-height:130px; overflow-y:auto;
+  }
+  .history-head{
+    padding:8px 16px; font-family:var(--mono); font-size:10.5px; color:var(--text-faint);
+    text-transform:uppercase; letter-spacing:0.08em; display:flex; justify-content:space-between;
+    position:sticky; top:0; background:var(--surface);
+  }
+  .history-item{
+    padding:6px 16px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+    cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    border-left:2px solid transparent;
+  }
+  .history-item:hover{ background:var(--surface-2); color:var(--text); border-left-color:var(--accent); }
+  .history-item .t{ color:var(--text-faint); margin-right:8px; }
+
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line-soft); border-radius:5px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .loading-screen{
+    position:fixed; inset:0; background:var(--bg); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:10px; z-index:50; color:var(--text-dim);
+    font-family:var(--mono); font-size:12.5px;
+  }
+  .loading-screen .dots::after{ content:''; animation: dots 1.2s steps(4,end) infinite; }
+  @keyframes dots{ 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+
+  /* ---------- Responsive / mobile ---------- */
+  @media (max-width: 860px){
+    header{ padding:10px 12px; }
+    .brand .sub{ display:none; }
+    .brand h1{ font-size:13.5px; }
+    .brand .mark{ width:26px; height:26px; font-size:12px; }
+    .menu-toggle{ display:flex; }
+    .header-actions{ gap:5px; }
+    .header-actions button{ padding:7px 9px; }
+    .header-actions .btn-label{ display:none; }
+    .header-actions button.primary .btn-label{ display:inline; } /* keep "Run" legible */
+
+    .shell{ position:relative; }
+    .sidebar{
+      position:fixed; top:0; left:0; height:100%; width:min(78vw, 300px); z-index:20;
+      transform:translateX(-100%); transition:transform .2s ease; box-shadow:2px 0 24px rgba(0,0,0,0.4);
+    }
+    .sidebar.open{ transform:translateX(0); }
+    .sidebar-backdrop.open{ display:block; }
+
+    .toolbar{ padding:8px 10px; gap:6px; }
+    .toolbar button .btn-label{ display:none; }
+    .toolbar button{ padding:8px; }
+    .toolbar .hint{ display:none; }
+
+    .CodeMirror{ font-size:13px; }
+    table.grid{ font-size:11.5px; }
+    table.grid thead th, table.grid tbody td{ padding:6px 9px; }
+
+    .history-drawer{ max-height:100px; }
+    #filterInput{ flex:1; min-width:100px; }
+  }
+
+  @media (max-width: 480px){
+    .brand h1{ font-size:12.5px; }
+    header{ padding:8px 10px; }
+    .header-actions button{ padding:6px 8px; }
+    .results-bar{ padding:8px 10px; }
+    .history-head{ padding:6px 10px; }
+    .history-item{ padding:5px 10px; }
+    .row-cap-notice{ padding:6px 10px; }
+  }
+
+  @media (hover: none){
+    .table-export-btn{ opacity:1; } /* no hover on touch — always show the export icon */
+    button, .col-row, .result-tab{ min-height:30px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="brand"><div class="mark">§</div></div>
+  <div>booting sqlite (wasm)<span class="dots"></span></div>
+</div>
+
+<header>
+  <div class="brand">
+    <button class="ghost icon-only menu-toggle" id="btnMenuToggle" title="Toggle schema panel" aria-label="Toggle schema panel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="mark">§</div>
+    <div>
+      <h1>SQL Server Online Editor</h1>
+      <div class="sub">Write · Run · Share — runs on an in-browser SQL engine</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="ghost" id="btnExport" title="Export results as CSV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M4 19h16"/></svg>
+      <span class="btn-label">Export CSV</span>
+    </button>
+    <button class="ghost" id="btnReset" title="Drop everything and start from a blank database">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M5.5 15a8 8 0 0014.9-3M18.5 9A8 8 0 003.6 12"/></svg>
+      <span class="btn-label">Reset</span>
+    </button>
+    <button class="primary" id="btnRun" title="Run query (Ctrl / Cmd + Enter)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <span class="btn-label">Run</span>
+    </button>
+  </div>
+</header>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head"><span>Schema</span><span id="tableCount"></span></div>
+    <div class="table-list" id="tableList"></div>
+    <div class="sidebar-foot">Tables you create will show up here · <code>Ctrl+Space</code> for autocomplete</div>
+  </aside>
+
+  <div class="main">
+    <div class="toolbar">
+      <div class="toolbar-scroll">
+      <button class="ghost" id="btnFormat" title="Tidy up whitespace">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+        <span class="btn-label">Format</span>
+      </button>
+      <button class="ghost" id="btnClearEditor" title="Clear editor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <span class="btn-label">Clear</span>
+      </button>
+      <button class="ghost" id="btnExplain" title="Show the query plan (EXPLAIN QUERY PLAN)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <span class="btn-label">Explain</span>
+      </button>
+      <span class="toolbar-divider"></span>
+      <button class="ghost" id="btnOpenSql" title="Load a .sql file into the editor">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/></svg>
+        <span class="btn-label">Open .sql</span>
+      </button>
+      <button class="ghost" id="btnSaveSql" title="Download the editor contents as a .sql file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        <span class="btn-label">Save .sql</span>
+      </button>
+      <button class="ghost" id="btnOpenDb" title="Load a .sqlite database file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+        <span class="btn-label">Open DB</span>
+      </button>
+      <button class="ghost" id="btnSaveDb" title="Download the current database as a .sqlite file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+        <span class="btn-label">Save DB</span>
+      </button>
+      <button class="ghost" id="btnImportCsv" title="Create a new table from a CSV file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+        <span class="btn-label">Import CSV</span>
+      </button>
+      <input type="file" id="fileOpenSql" accept=".sql,.txt" style="display:none;">
+      <input type="file" id="fileOpenDb" accept=".sqlite,.db,.sqlite3" style="display:none;">
+      <input type="file" id="fileImportCsv" accept=".csv" style="display:none;">
+      </div>
+      <div class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</div>
+    </div>
+
+    <div class="editor-wrap" id="editorWrap">
+      <textarea id="editor"></textarea>
+      <div class="resize-handle" id="resizeHandle" title="Drag to resize"><span></span></div>
+    </div>
+
+    <div class="results-panel">
+      <div class="results-bar">
+        <span class="status" id="statusText">Ready</span>
+        <div class="result-tabs" id="resultTabs" style="display:none;"></div>
+        <input type="text" id="filterInput" placeholder="Filter rows…" style="display:none;">
+        <span class="meta" id="metaText"></span>
+      </div>
+      <div class="results-body" id="resultsBody">
+        <div class="empty-state">
+          <div class="glyph">┌─┬─┐<br>├─┼─┤<br>└─┴─┘</div>
+          <p>No database or tables are preset. Run the boilerplate already in the editor, or clear it and write your own <em>CREATE TABLE</em> to get started.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="history-drawer">
+      <div class="history-head"><span>History</span><span id="historyClear" style="cursor:pointer;">clear</span></div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Boilerplate shown in the editor on load — nothing is pre-created in the
+// database itself. The database starts completely empty, same as a fresh
+// SQL Server instance with no tables.
+const BOILERPLATE_SQL = `-- Welcome to the SQL Server Online Editor.
+-- There's no preset database or tables here — this box is empty on purpose.
+-- Write your own schema below, select all of it, and hit Run (or Ctrl/Cmd + Enter).
+-- Sample boilerplate to get you started:
+
+CREATE TABLE customers (
+  id INT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  city VARCHAR(50),
+  signed_up_on DATE
+);
+
+INSERT INTO customers (id, name, city, signed_up_on) VALUES
+  (1, 'Ariana Cole', 'Austin', '2024-01-15'),
+  (2, 'Devon Marsh', 'Denver', '2024-03-02'),
+  (3, 'Priya Nair', 'Seattle', '2024-06-21');
+
+SELECT * FROM customers;
+`;
+
+let db, SQL, engineReady = false;
+let history = [];
+let resultSets = [];        // all result sets from the last run
+let activeTabIndex = 0;     // which result set tab is showing
+let sortState = { col: -1, dir: 1 };
+let filterText = '';
+const ROW_CAP = 500;        // cap DOM rows so a huge SELECT can't freeze the tab
+
+const loadingScreen = document.getElementById('loadingScreen');
+const tableList = document.getElementById('tableList');
+const tableCount = document.getElementById('tableCount');
+const statusText = document.getElementById('statusText');
+const metaText = document.getElementById('metaText');
+const resultsBody = document.getElementById('resultsBody');
+const historyList = document.getElementById('historyList');
+const resultTabs = document.getElementById('resultTabs');
+const filterInput = document.getElementById('filterInput');
+const btnRun = document.getElementById('btnRun');
+const sidebar = document.getElementById('sidebar');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+const editorWrap = document.getElementById('editorWrap');
+
+const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
+  mode: 'text/x-sql',
+  theme: 'dracula',
+  lineNumbers: true,
+  indentWithTabs: true,
+  smartIndent: true,
+  matchBrackets: true,
+  autofocus: true,
+  extraKeys: {
+    'Ctrl-Enter': runQuery,
+    'Cmd-Enter': runQuery,
+    'Ctrl-Space': 'autocomplete'
+  }
+});
+cm.setValue(BOILERPLATE_SQL);
+
+initDB();
+
+async function initDB() {
+  try {
+    SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` });
+    db = new SQL.Database();
+    engineReady = true;
+    btnRun.disabled = false;
+    renderSchema();
+    loadingScreen.style.display = 'none';
+    cm.refresh();
+  } catch (e) {
+    loadingScreen.innerHTML = `<div style="color:#C9604C;max-width:420px;text-align:center;padding:20px;font-family:var(--mono);font-size:12.5px;">Could not load the SQLite engine.<br>${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+btnRun.disabled = true; // re-enabled once the WASM engine finishes loading
+
+function renderSchema() {
+  const tables = db.exec(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`);
+  tableList.innerHTML = '';
+  if (!tables.length) {
+    tableCount.textContent = '0';
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:14px 8px; font-family:var(--mono); font-size:11.5px; color:var(--text-faint); line-height:1.5;';
+    empty.textContent = 'No tables yet. Run a CREATE TABLE statement to see it appear here.';
+    tableList.appendChild(empty);
+    return;
+  }
+  const names = tables[0].values.map(r => r[0]);
+  tableCount.textContent = names.length;
+
+  names.forEach(name => {
+    const info = db.exec(`PRAGMA table_info(${quoteIdent(name)});`);
+    const cols = info.length ? info[0].values : [];
+    const countRes = db.exec(`SELECT COUNT(*) FROM ${quoteIdent(name)};`);
+    const rowCount = countRes.length ? countRes[0].values[0][0] : 0;
+    const uniqueCols = getUniqueColumns(name);
+
+    const details = document.createElement('details');
+    details.className = 'table-item';
+    details.open = true;
+
+    const summary = document.createElement('summary');
+    const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chevron.setAttribute('class', 'chevron');
+    chevron.setAttribute('viewBox', '0 0 24 24');
+    chevron.setAttribute('fill', 'none');
+    chevron.setAttribute('stroke', 'currentColor');
+    chevron.setAttribute('stroke-width', '3');
+    chevron.innerHTML = '<path d="M9 6l6 6-6 6"/>';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'n';
+    nameSpan.textContent = name; // textContent — safe even if the table name has odd characters
+    summary.appendChild(chevron);
+    summary.appendChild(nameSpan);
+
+    const exportBtn = document.createElement('span');
+    exportBtn.className = 'table-export-btn';
+    exportBtn.title = `Export ${name} as CSV`;
+    exportBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M4 19h16"/></svg>';
+    exportBtn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      exportTableAsCsv(name);
+    });
+    summary.appendChild(exportBtn);
+
+    summary.addEventListener('dblclick', () => {
+      cm.setValue(`SELECT * FROM ${quoteIdent(name)} LIMIT 100;`);
+      runQuery();
+    });
+    details.appendChild(summary);
+
+    const colsWrap = document.createElement('div');
+    colsWrap.className = 'cols';
+    cols.forEach(c => {
+      // PRAGMA table_info columns: [cid, name, type, notnull, dflt_value, pk]
+      const colName = c[1], colType = c[2] || 'ANY', notNull = c[3] === 1, pk = c[5] > 0;
+      const isUnique = uniqueCols.has(colName);
+
+      const row = document.createElement('div');
+      row.className = 'col-row';
+
+      const left = document.createElement('div');
+      left.className = 'col-left';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'col-name';
+      nameEl.textContent = colName;
+      left.appendChild(nameEl);
+      if (pk) { const b = document.createElement('span'); b.className = 'badge badge-pk'; b.textContent = 'PK'; left.appendChild(b); }
+      if (isUnique && !pk) { const b = document.createElement('span'); b.className = 'badge badge-unique'; b.textContent = 'UNIQUE'; left.appendChild(b); }
+      if (notNull && !pk) { const b = document.createElement('span'); b.className = 'badge badge-notnull'; b.textContent = 'NOT NULL'; left.appendChild(b); }
+
+      const typeEl = document.createElement('span');
+      typeEl.className = 'type';
+      typeEl.textContent = colType;
+
+      row.appendChild(left);
+      row.appendChild(typeEl);
+      row.title = 'Click to insert into editor';
+      row.addEventListener('click', () => insertAtCursor(colName));
+      colsWrap.appendChild(row);
+    });
+    details.appendChild(colsWrap);
+
+    const rc = document.createElement('div');
+    rc.className = 'row-count';
+    rc.textContent = `${rowCount} row${rowCount === 1 ? '' : 's'}`;
+    details.appendChild(rc);
+
+    tableList.appendChild(details);
+  });
+}
+
+// Columns covered by a UNIQUE index (excluding the automatic index that
+// backs an INTEGER PRIMARY KEY, since PK is already badged separately).
+function getUniqueColumns(tableName) {
+  const unique = new Set();
+  try {
+    const idxList = db.exec(`PRAGMA index_list(${quoteIdent(tableName)});`);
+    if (!idxList.length) return unique;
+    // index_list columns: [seq, name, unique, origin, partial]
+    idxList[0].values.forEach(row => {
+      const idxName = row[1], isUnique = row[2] === 1, origin = row[3];
+      if (!isUnique || origin === 'pk') return;
+      const idxInfo = db.exec(`PRAGMA index_info(${quoteIdent(idxName)});`);
+      if (idxInfo.length) idxInfo[0].values.forEach(r => unique.add(r[2]));
+    });
+  } catch (e) { /* older sqlite builds without index_list — badge is best-effort */ }
+  return unique;
+}
+
+function exportTableAsCsv(tableName) {
+  const res = db.exec(`SELECT * FROM ${quoteIdent(tableName)};`);
+  if (!res.length) { alert(`"${tableName}" has no columns to export.`); return; }
+  const { columns, values } = res[0];
+  const esc = v => {
+    if (v === null) return '';
+    let s = String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [columns.map(esc).join(','), ...values.map(row => row.map(esc).join(','))].join('\n');
+  downloadBlob(csv, `${tableName}.csv`, 'text/csv');
+}
+
+function insertAtCursor(text) {
+  cm.replaceRange(text, cm.getCursor());
+  cm.focus();
+}
+
+function quoteIdent(name) {
+  return '"' + String(name).replace(/"/g, '""') + '"';
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Split on statement-terminating semicolons well enough to sanity-check each
+// piece for destructive intent. Not a full SQL parser — just a safety net,
+// not a security boundary (the database is local to this browser tab).
+function splitStatements(sql) {
+  return sql.split(';').map(s => s.trim()).filter(Boolean);
+}
+
+function isDestructive(stmt) {
+  const s = stmt.replace(/--.*$/gm, '').trim();
+  if (/^\s*(DROP|TRUNCATE)\b/i.test(s)) return true;
+  if (/^\s*DELETE\b/i.test(s) && !/\bWHERE\b/i.test(s)) return true;
+  if (/^\s*UPDATE\b/i.test(s) && !/\bWHERE\b/i.test(s)) return true;
+  return false;
+}
+
+let lastResultForExport = null;
+
+function runQuery() {
+  if (!engineReady) { statusText.textContent = 'Engine still loading…'; statusText.className = 'status'; return; }
+  const sql = cm.getValue().trim();
+  if (!sql) return;
+
+  const statements = splitStatements(sql);
+  const destructive = statements.filter(isDestructive);
+  if (destructive.length) {
+    const ok = confirm(
+      `This will run ${destructive.length === 1 ? 'a statement' : destructive.length + ' statements'} that ` +
+      `can permanently remove data (DROP / TRUNCATE, or DELETE / UPDATE with no WHERE clause):\n\n` +
+      destructive.map(s => '  ' + s.slice(0, 90)).join('\n') +
+      `\n\nRun it anyway?`
+    );
+    if (!ok) { statusText.textContent = 'Cancelled'; statusText.className = 'status'; return; }
+  }
+
+  const started = performance.now();
+  try {
+    const results = db.exec(sql);
+    const elapsed = (performance.now() - started).toFixed(1);
+    if (/\b(CREATE|DROP|ALTER|INSERT|UPDATE|DELETE|TRUNCATE|REPLACE)\b/i.test(sql)) renderSchema();
+    pushHistory(sql, true);
+
+    resultSets = results;
+    activeTabIndex = 0;
+    sortState = { col: -1, dir: 1 };
+    filterText = '';
+    filterInput.value = '';
+
+    if (!results.length) {
+      lastResultForExport = null;
+      resultTabs.style.display = 'none';
+      filterInput.style.display = 'none';
+      statusText.textContent = 'Executed — no rows returned';
+      statusText.className = 'status ok';
+      metaText.textContent = `${elapsed} ms`;
+      resultsBody.innerHTML = '';
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = '<div class="glyph">ok</div>';
+      const p = document.createElement('p');
+      p.textContent = "Statement ran successfully. This kind of query (insert / update / ddl) doesn't return a result set — try a SELECT to see rows here.";
+      empty.appendChild(p);
+      resultsBody.appendChild(empty);
+      return;
+    }
+
+    metaText.textContent = `${elapsed} ms`;
+    renderResultTabs();
+    showActiveResult();
+  } catch (e) {
+    pushHistory(sql, false);
+    statusText.textContent = 'Query failed';
+    statusText.className = 'status err';
+    metaText.textContent = '';
+    lastResultForExport = null;
+    resultTabs.style.display = 'none';
+    filterInput.style.display = 'none';
+    resultsBody.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = e.message || String(e);
+    resultsBody.appendChild(box);
+  }
+}
+
+function renderResultTabs() {
+  resultTabs.innerHTML = '';
+  if (resultSets.length <= 1) { resultTabs.style.display = 'none'; return; }
+  resultTabs.style.display = 'flex';
+  resultSets.forEach((res, i) => {
+    const tab = document.createElement('div');
+    tab.className = 'result-tab' + (i === activeTabIndex ? ' active' : '');
+    tab.textContent = `Result ${i + 1} (${res.values.length})`;
+    tab.addEventListener('click', () => {
+      activeTabIndex = i;
+      sortState = { col: -1, dir: 1 };
+      filterText = '';
+      filterInput.value = '';
+      renderResultTabs();
+      showActiveResult();
+    });
+    resultTabs.appendChild(tab);
+  });
+}
+
+function showActiveResult() {
+  const res = resultSets[activeTabIndex];
+  lastResultForExport = res;
+  filterInput.style.display = '';
+  statusText.textContent = `${res.values.length} row${res.values.length === 1 ? '' : 's'} returned`;
+  statusText.className = 'status ok';
+  renderTable(res);
+}
+
+function getFilteredSortedRows(res) {
+  let rows = res.values;
+  if (filterText) {
+    const needle = filterText.toLowerCase();
+    rows = rows.filter(row => row.some(cell => cell !== null && String(cell).toLowerCase().includes(needle)));
+  }
+  if (sortState.col >= 0) {
+    const c = sortState.col, dir = sortState.dir;
+    rows = rows.slice().sort((a, b) => {
+      const va = a[c], vb = b[c];
+      if (va === null && vb === null) return 0;
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+      return String(va).localeCompare(String(vb)) * dir;
+    });
+  }
+  return rows;
+}
+
+function renderTable(res) {
+  const { columns } = res;
+  const rows = getFilteredSortedRows(res);
+
+  resultsBody.innerHTML = '';
+  const table = document.createElement('table');
+  table.className = 'grid';
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  const thNum = document.createElement('th');
+  thNum.className = 'rownum';
+  thNum.textContent = '#';
+  headRow.appendChild(thNum);
+  columns.forEach((c, colIdx) => {
+    const th = document.createElement('th');
+    th.textContent = c;
+    if (sortState.col === colIdx) {
+      const arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      arrow.textContent = sortState.dir === 1 ? '▲' : '▼';
+      th.appendChild(arrow);
+    }
+    th.title = 'Click to sort';
+    th.addEventListener('click', () => {
+      sortState = sortState.col === colIdx ? { col: colIdx, dir: -sortState.dir } : { col: colIdx, dir: 1 };
+      renderTable(res);
+    });
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const shown = rows.slice(0, ROW_CAP);
+  shown.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    tr.style.animationDelay = `${Math.min(i, 40) * 8}ms`;
+    const tdNum = document.createElement('td');
+    tdNum.className = 'rownum';
+    tdNum.textContent = i + 1;
+    tr.appendChild(tdNum);
+    row.forEach(cell => {
+      const td = document.createElement('td');
+      if (cell === null) { td.className = 'null'; td.textContent = 'NULL'; }
+      else td.textContent = cell;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  resultsBody.appendChild(table);
+
+  if (rows.length > ROW_CAP) {
+    const notice = document.createElement('div');
+    notice.className = 'row-cap-notice';
+    notice.textContent = `Showing first ${ROW_CAP} of ${rows.length} matching rows — refine your query or filter, or use Export CSV for the full set.`;
+    resultsBody.appendChild(notice);
+  }
+}
+
+filterInput.addEventListener('input', () => {
+  filterText = filterInput.value;
+  if (resultSets.length) renderTable(resultSets[activeTabIndex]);
+});
+
+function pushHistory(sql, ok) {
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  history.unshift({ sql, ok, time });
+  history = history.slice(0, 30);
+  renderHistory();
+}
+
+function renderHistory() {
+  historyList.innerHTML = '';
+  history.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.style.color = h.ok ? '' : 'var(--error)';
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = h.time;
+    div.appendChild(t);
+    div.appendChild(document.createTextNode(h.sql.replace(/\s+/g, ' ').slice(0, 90)));
+    div.addEventListener('click', () => { cm.setValue(h.sql); cm.focus(); });
+    historyList.appendChild(div);
+  });
+}
+
+document.getElementById('btnRun').addEventListener('click', runQuery);
+document.getElementById('btnClearEditor').addEventListener('click', () => { cm.setValue(''); cm.focus(); });
+document.getElementById('btnFormat').addEventListener('click', () => {
+  let sql = cm.getValue();
+  sql = sql.replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  sql = sql.replace(/\bSELECT\b/gi, '\nSELECT').replace(/\bFROM\b/gi, '\nFROM').replace(/\bWHERE\b/gi, '\nWHERE')
+           .replace(/\bJOIN\b/gi, '\nJOIN').replace(/\bGROUP BY\b/gi, '\nGROUP BY').replace(/\bORDER BY\b/gi, '\nORDER BY')
+           .replace(/\bHAVING\b/gi, '\nHAVING').replace(/\bLIMIT\b/gi, '\nLIMIT');
+  cm.setValue(sql.trim());
+});
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (!confirm('Drop everything and start from a blank database? This discards every table and row you created.')) return;
+  db.close();
+  db = new SQL.Database();
+  renderSchema();
+  resultSets = [];
+  statusText.textContent = 'Database cleared — back to blank';
+  statusText.className = 'status ok';
+  metaText.textContent = '';
+  resultTabs.style.display = 'none';
+  filterInput.style.display = 'none';
+  resultsBody.innerHTML = '';
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  empty.innerHTML = '<div class="glyph">┌─┬─┐<br>├─┼─┤<br>└─┴─┘</div>';
+  const p = document.createElement('p');
+  p.textContent = 'No database or tables are preset. Write a CREATE TABLE statement to get started.';
+  empty.appendChild(p);
+  resultsBody.appendChild(empty);
+});
+document.getElementById('historyClear').addEventListener('click', () => { history = []; renderHistory(); });
+
+document.getElementById('btnExport').addEventListener('click', () => {
+  if (!lastResultForExport) { alert('Run a SELECT query first — nothing to export yet.'); return; }
+  const { columns, values } = lastResultForExport;
+  // Neutralize CSV formula injection: a cell opening with = + - @ can be
+  // interpreted as a live formula by Excel/Sheets when the file is opened.
+  const esc = v => {
+    if (v === null) return '';
+    let s = String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = [columns.map(esc).join(','), ...values.map(row => row.map(esc).join(','))].join('\n');
+  downloadBlob(csv, 'query-results.csv', 'text/csv');
+});
+
+document.getElementById('btnSaveSql').addEventListener('click', () => {
+  downloadBlob(cm.getValue(), 'query.sql', 'text/plain');
+});
+
+document.getElementById('btnOpenSql').addEventListener('click', () => document.getElementById('fileOpenSql').click());
+document.getElementById('fileOpenSql').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const text = await file.text();
+  cm.setValue(text);
+  ev.target.value = '';
+});
+
+document.getElementById('btnSaveDb').addEventListener('click', () => {
+  if (!engineReady) return;
+  const bytes = db.export();
+  const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'database.sqlite';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btnOpenDb').addEventListener('click', () => document.getElementById('fileOpenDb').click());
+document.getElementById('fileOpenDb').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  if (!confirm(`Replace the current database with "${file.name}"? Unsaved changes will be lost.`)) { ev.target.value = ''; return; }
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    db.close();
+    db = new SQL.Database(buf);
+    renderSchema();
+    statusText.textContent = `Loaded ${file.name}`;
+    statusText.className = 'status ok';
+    metaText.textContent = '';
+  } catch (e) {
+    statusText.textContent = 'Could not open that file';
+    statusText.className = 'status err';
+    resultsBody.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = 'Not a valid SQLite database file: ' + (e.message || String(e));
+    resultsBody.appendChild(box);
+  }
+  ev.target.value = '';
+});
+
+document.getElementById('btnImportCsv').addEventListener('click', () => document.getElementById('fileImportCsv').click());
+document.getElementById('fileImportCsv').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const rows = parseCsv(text);
+    if (!rows.length) { alert('That CSV file looks empty.'); return; }
+
+    const header = rows[0];
+    const dataRows = rows.slice(1);
+    const defaultName = file.name.replace(/\.csv$/i, '').replace(/[^a-zA-Z0-9_]/g, '_') || 'imported_table';
+    const tableName = prompt(`Table name for this import (${dataRows.length} row${dataRows.length === 1 ? '' : 's'}, ${header.length} columns):`, defaultName);
+    if (!tableName) return;
+    const safeTable = quoteIdent(tableName);
+
+    // De-duplicate and sanitize column names so they're always valid identifiers.
+    const seen = new Map();
+    const colNames = header.map((h, i) => {
+      let base = String(h).trim().replace(/[^a-zA-Z0-9_]/g, '_') || `column_${i + 1}`;
+      if (/^[0-9]/.test(base)) base = '_' + base;
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      return count ? `${base}_${count}` : base;
+    });
+
+    if (!engineReady) { alert('The SQL engine is still loading — try again in a moment.'); return; }
+
+    const existing = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name=${sqlStringLiteral(tableName)};`);
+    if (existing.length && !confirm(`A table named "${tableName}" already exists. Drop it and reimport?`)) return;
+
+    db.run('BEGIN TRANSACTION;');
+    try {
+      if (existing.length) db.run(`DROP TABLE ${safeTable};`);
+      const colDefs = colNames.map(c => `${quoteIdent(c)} TEXT`).join(', ');
+      db.run(`CREATE TABLE ${safeTable} (${colDefs});`);
+
+      const placeholders = colNames.map(() => '?').join(', ');
+      const stmt = db.prepare(`INSERT INTO ${safeTable} (${colNames.map(quoteIdent).join(', ')}) VALUES (${placeholders});`);
+      dataRows.forEach(r => {
+        const padded = colNames.map((_, i) => (i < r.length ? r[i] : null));
+        stmt.run(padded);
+      });
+      stmt.free();
+      db.run('COMMIT;');
+    } catch (e) {
+      db.run('ROLLBACK;');
+      throw e;
+    }
+
+    renderSchema();
+    cm.setValue(`SELECT * FROM ${safeTable} LIMIT 100;`);
+    runQuery();
+    statusText.textContent = `Imported "${tableName}" — ${dataRows.length} row${dataRows.length === 1 ? '' : 's'}, all columns as TEXT`;
+    statusText.className = 'status ok';
+  } catch (e) {
+    statusText.textContent = 'Import failed';
+    statusText.className = 'status err';
+    resultsBody.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = 'Could not import that CSV: ' + (e.message || String(e));
+    resultsBody.appendChild(box);
+  }
+});
+
+function sqlStringLiteral(s) {
+  return "'" + String(s).replace(/'/g, "''") + "'";
+}
+
+// Minimal RFC-4180-ish CSV parser: handles quoted fields, escaped quotes ("")
+// and commas/newlines inside quotes. Good enough for typical exported CSVs.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i], next = text[i + 1];
+    if (inQuotes) {
+      if (c === '"' && next === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip, \n handles the line break */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => !(r.length === 1 && r[0] === ''));
+}
+
+function downloadBlob(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------- Mobile schema drawer ----------
+function openSidebar() { sidebar.classList.add('open'); sidebarBackdrop.classList.add('open'); }
+function closeSidebar() { sidebar.classList.remove('open'); sidebarBackdrop.classList.remove('open'); }
+document.getElementById('btnMenuToggle').addEventListener('click', () => {
+  sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+});
+sidebarBackdrop.addEventListener('click', closeSidebar);
+// Close the drawer automatically once a table/column is used, so the
+// small-screen flow is: open schema → tap a table or column → back to the editor.
+tableList.addEventListener('click', (ev) => {
+  if (window.innerWidth <= 860 && (ev.target.closest('.col-row') || ev.target.closest('.table-export-btn'))) closeSidebar();
+});
+tableList.addEventListener('dblclick', () => { if (window.innerWidth <= 860) closeSidebar(); });
+
+// ---------- Drag-to-resize editor / results split ----------
+(function setupResize() {
+  const handle = document.getElementById('resizeHandle');
+  let dragging = false, startY = 0, startHeight = 0;
+
+  function onMove(clientY) {
+    const delta = clientY - startY;
+    const minH = 90, maxH = window.innerHeight - 220;
+    const next = Math.max(minH, Math.min(maxH, startHeight + delta));
+    cm.setSize(null, next + 'px');
+  }
+  function start(clientY) {
+    dragging = true;
+    startY = clientY;
+    startHeight = cm.getWrapperElement().offsetHeight;
+    handle.classList.add('dragging');
+  }
+  function stop() { dragging = false; handle.classList.remove('dragging'); }
+
+  handle.addEventListener('mousedown', (e) => { start(e.clientY); e.preventDefault(); });
+  window.addEventListener('mousemove', (e) => { if (dragging) onMove(e.clientY); });
+  window.addEventListener('mouseup', stop);
+
+  handle.addEventListener('touchstart', (e) => { start(e.touches[0].clientY); }, { passive: true });
+  window.addEventListener('touchmove', (e) => { if (dragging) onMove(e.touches[0].clientY); }, { passive: true });
+  window.addEventListener('touchend', stop);
+})();
+
+// ---------- Explain query plan ----------
+document.getElementById('btnExplain').addEventListener('click', () => {
+  if (!engineReady) { statusText.textContent = 'Engine still loading…'; statusText.className = 'status'; return; }
+  const sql = cm.getValue().trim();
+  if (!sql) return;
+  const first = splitStatements(sql)[0];
+  if (!first) return;
+  try {
+    const res = db.exec(`EXPLAIN QUERY PLAN ${first};`);
+    pushHistory(`EXPLAIN QUERY PLAN ${first}`, true);
+    if (!res.length) {
+      resultsBody.innerHTML = '';
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      const p = document.createElement('p');
+      p.textContent = 'No plan to show for that statement — EXPLAIN QUERY PLAN works on SELECT, UPDATE, DELETE and similar statements.';
+      empty.appendChild(p);
+      resultsBody.appendChild(empty);
+      statusText.textContent = 'No query plan';
+      statusText.className = 'status';
+      metaText.textContent = '';
+      resultTabs.style.display = 'none';
+      filterInput.style.display = 'none';
+      return;
+    }
+    resultSets = res;
+    activeTabIndex = 0;
+    sortState = { col: -1, dir: 1 };
+    filterText = ''; filterInput.value = '';
+    renderResultTabs();
+    showActiveResult();
+    statusText.textContent = 'Query plan';
+    statusText.className = 'status ok';
+    metaText.textContent = '';
+  } catch (e) {
+    statusText.textContent = 'Could not get a plan';
+    statusText.className = 'status err';
+    resultsBody.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = e.message || String(e);
+    resultsBody.appendChild(box);
+  }
+});
+</script>
+</body>
+</html>
