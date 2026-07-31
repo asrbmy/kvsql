@@ -662,11 +662,17 @@ let lastResultForExport = null;
 // This editor runs on SQLite under the hood (via sql.js). Classic SQL —
 // CREATE TABLE, DROP, ALTER, SELECT/FROM/WHERE, relational operators,
 // BETWEEN, AND/OR/NOT, IS [NOT] NULL, INSERT, DELETE, UPDATE, ROUND(),
-// UPPER()/LOWER(), SUBSTR(), LENGTH(), INSTR(), TRIM()/LTRIM()/RTRIM(), and
-// the aggregates MAX()/MIN()/AVG()/SUM()/COUNT() including COUNT(*) — all
-// already work natively, no changes needed. Everything below fills in the
-// handful of MySQL-flavored commands that SQLite doesn't ship with, plus
-// DESC/DESCRIBE and a CREATE DATABASE / DROP DATABASE / USE shim.
+// UPPER()/LOWER(), SUBSTR(), LENGTH(), INSTR(), TRIM()/LTRIM()/RTRIM(),
+// the aggregates MAX()/MIN()/AVG()/SUM()/COUNT() including COUNT(*), JOIN
+// (INNER/LEFT/RIGHT/CROSS), GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET,
+// DISTINCT, IN/NOT IN, LIKE, UNION/UNION ALL, subqueries, CASE WHEN, WITH
+// (CTEs), COALESCE()/IFNULL(), CAST(), ABS(), GROUP_CONCAT(), REPLACE(),
+// and constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, DEFAULT),
+// CREATE VIEW, CREATE INDEX — all already work natively, no changes needed.
+// Everything below fills in the handful of MySQL-flavored commands SQLite
+// doesn't ship with: CONCAT(), CEIL()/CEILING()/FLOOR(), DESC/DESCRIBE,
+// SHOW TABLES/SHOW DATABASES/SHOW COLUMNS FROM, TRUNCATE, AUTO_INCREMENT,
+// and a CREATE DATABASE / DROP DATABASE / USE shim.
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -701,10 +707,29 @@ function mysqlSubstr(str, start, len) {
   return l <= 0 ? '' : s.slice(from, from + l);
 }
 
+// Builds a fixed-arity wrapper around mysqlConcat so SQLite can register it
+// as an overload for exactly n arguments (SQLite dispatches by argument
+// count, and that count is read from the JS function's .length property —
+// which is configurable even though not writable, hence defineProperty).
+function makeConcatFn(n) {
+  const fn = function () {
+    for (let i = 0; i < arguments.length; i++) if (arguments[i] === null) return null;
+    let out = '';
+    for (let i = 0; i < arguments.length; i++) out += String(arguments[i]);
+    return out;
+  };
+  Object.defineProperty(fn, 'length', { value: n });
+  return fn;
+}
+
 // Registers the MySQL-style functions SQLite doesn't provide out of the box.
 // Safe to call repeatedly — each is a fresh SQL.Database with no functions
 // registered yet (after Reset, or after opening a .sqlite file).
 function registerCustomFunctions(database) {
+  // MySQL enables FK enforcement implicitly; SQLite defaults it OFF, so
+  // FOREIGN KEY / CHECK constraints wouldn't otherwise be enforced here.
+  try { database.run('PRAGMA foreign_keys = ON;'); } catch (e) {}
+
   const defs = {
     POWER: (x, y) => (x === null || y === null) ? null : Math.pow(x, y),
     MOD: (x, y) => (x === null || y === null || y === 0) ? null : x % y,
@@ -722,6 +747,9 @@ function registerCustomFunctions(database) {
     YEAR: (d) => { const p = parseSqlDate(d); return p ? p.getUTCFullYear() : null; },
     DAY: (d) => { const p = parseSqlDate(d); return p ? p.getUTCDate() : null; },
     DAYNAME: (d) => { const p = parseSqlDate(d); return p ? DAY_NAMES[p.getUTCDay()] : null; },
+    CEIL: (x) => x === null ? null : Math.ceil(x),
+    CEILING: (x) => x === null ? null : Math.ceil(x),
+    FLOOR: (x) => x === null ? null : Math.floor(x),
   };
   Object.entries(defs).forEach(([name, fn]) => {
     try { database.create_function(name, fn); } catch (e) { console.warn(`Could not register ${name}()`, e); }
@@ -732,6 +760,10 @@ function registerCustomFunctions(database) {
     try { database.create_function(name, (s, start) => fn(s, start)); } catch (e) {}
     try { database.create_function(name, (s, start, len) => fn(s, start, len)); } catch (e) {}
   });
+  // CONCAT() is variadic in MySQL — register overloads for 1 through 8 args.
+  for (let n = 1; n <= 8; n++) {
+    try { database.create_function('CONCAT', makeConcatFn(n)); } catch (e) {}
+  }
 }
 
 // Removes every table in the active database. Used for "DROP DATABASE ..."
@@ -781,6 +813,33 @@ function preprocessSql(rawSql) {
     if (m) {
       const t = m[1].replace(/'/g, "''");
       s = `SELECT name AS "Field", type AS "Type", CASE WHEN "notnull" = 0 THEN 'YES' ELSE 'NO' END AS "Null", CASE WHEN pk > 0 THEN 'PRI' ELSE '' END AS "Key", dflt_value AS "Default" FROM pragma_table_info('${t}')`;
+      kept.push(s);
+      return;
+    }
+    m = s.match(/^\s*SHOW\s+COLUMNS\s+FROM\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      const t = m[1].replace(/'/g, "''");
+      s = `SELECT name AS "Field", type AS "Type", CASE WHEN "notnull" = 0 THEN 'YES' ELSE 'NO' END AS "Null", CASE WHEN pk > 0 THEN 'PRI' ELSE '' END AS "Key", dflt_value AS "Default" FROM pragma_table_info('${t}')`;
+      kept.push(s);
+      return;
+    }
+    if (/^\s*SHOW\s+TABLES\s*$/i.test(s)) {
+      kept.push(`SELECT name AS "Tables" FROM sqlite_master WHERE type='table' ORDER BY name`);
+      return;
+    }
+    if (/^\s*SHOW\s+DATABASES\s*$/i.test(s)) {
+      kept.push(`SELECT ${sqlStringLiteral(activeDatabaseName || 'main')} AS "Database"`);
+      return;
+    }
+    m = s.match(/^\s*TRUNCATE\s+(?:TABLE\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      kept.push(`DELETE FROM ${quoteIdent(m[1])}`);
+      return;
+    }
+    // MySQL's AUTO_INCREMENT -> SQLite's AUTOINCREMENT (only follows
+    // INTEGER PRIMARY KEY in SQLite's syntax, unlike MySQL's freer column order).
+    if (/^\s*CREATE\s+TABLE\b/i.test(s)) {
+      s = s.replace(/\bAUTO_INCREMENT\b/gi, 'AUTOINCREMENT');
     }
 
     kept.push(s);
