@@ -487,6 +487,7 @@ async function initDB() {
   try {
     SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` });
     db = new SQL.Database();
+    registerCustomFunctions(db);
     engineReady = true;
     btnRun.disabled = false;
     renderSchema();
@@ -657,6 +658,137 @@ function isDestructive(stmt) {
 
 let lastResultForExport = null;
 
+// ---------- MySQL-style command support ----------
+// This editor runs on SQLite under the hood (via sql.js). Classic SQL —
+// CREATE TABLE, DROP, ALTER, SELECT/FROM/WHERE, relational operators,
+// BETWEEN, AND/OR/NOT, IS [NOT] NULL, INSERT, DELETE, UPDATE, ROUND(),
+// UPPER()/LOWER(), SUBSTR(), LENGTH(), INSTR(), TRIM()/LTRIM()/RTRIM(), and
+// the aggregates MAX()/MIN()/AVG()/SUM()/COUNT() including COUNT(*) — all
+// already work natively, no changes needed. Everything below fills in the
+// handful of MySQL-flavored commands that SQLite doesn't ship with, plus
+// DESC/DESCRIBE and a CREATE DATABASE / DROP DATABASE / USE shim.
+
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// Pulls the leading YYYY-MM-DD (with or without a time part) out of a date
+// value — the same format DATE()/NOW()-style values use here — for the
+// MONTH()/MONTHNAME()/YEAR()/DAY()/DAYNAME() functions below.
+function parseSqlDate(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatNow() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+// MySQL-flavored MID()/SUBSTRING(): 1-based start, negative start counts
+// from the end of the string, length is optional.
+function mysqlSubstr(str, start, len) {
+  if (str === null || str === undefined || start === null || start === undefined) return null;
+  const s = String(str);
+  const i = Math.trunc(start);
+  const from = i > 0 ? i - 1 : (i < 0 ? Math.max(s.length + i, 0) : 0);
+  if (len === undefined || len === null) return s.slice(from);
+  const l = Math.trunc(len);
+  return l <= 0 ? '' : s.slice(from, from + l);
+}
+
+// Registers the MySQL-style functions SQLite doesn't provide out of the box.
+// Safe to call repeatedly — each is a fresh SQL.Database with no functions
+// registered yet (after Reset, or after opening a .sqlite file).
+function registerCustomFunctions(database) {
+  const defs = {
+    POWER: (x, y) => (x === null || y === null) ? null : Math.pow(x, y),
+    MOD: (x, y) => (x === null || y === null || y === 0) ? null : x % y,
+    UCASE: (s) => s === null ? null : String(s).toUpperCase(),
+    LCASE: (s) => s === null ? null : String(s).toLowerCase(),
+    LEFT: (s, n) => (s === null || n === null) ? null : String(s).slice(0, Math.max(0, Math.trunc(n))),
+    RIGHT: (s, n) => {
+      if (s === null || n === null) return null;
+      const str = String(s), k = Math.trunc(n);
+      return k <= 0 ? '' : str.slice(Math.max(0, str.length - k));
+    },
+    NOW: () => formatNow(),
+    MONTH: (d) => { const p = parseSqlDate(d); return p ? p.getUTCMonth() + 1 : null; },
+    MONTHNAME: (d) => { const p = parseSqlDate(d); return p ? MONTH_NAMES[p.getUTCMonth()] : null; },
+    YEAR: (d) => { const p = parseSqlDate(d); return p ? p.getUTCFullYear() : null; },
+    DAY: (d) => { const p = parseSqlDate(d); return p ? p.getUTCDate() : null; },
+    DAYNAME: (d) => { const p = parseSqlDate(d); return p ? DAY_NAMES[p.getUTCDay()] : null; },
+  };
+  Object.entries(defs).forEach(([name, fn]) => {
+    try { database.create_function(name, fn); } catch (e) { console.warn(`Could not register ${name}()`, e); }
+  });
+  // MID() / SUBSTRING() are registered in both 2-arg and 3-arg forms —
+  // SQLite allows the same function name to be overloaded by argument count.
+  [['MID', mysqlSubstr], ['SUBSTRING', mysqlSubstr]].forEach(([name, fn]) => {
+    try { database.create_function(name, (s, start) => fn(s, start)); } catch (e) {}
+    try { database.create_function(name, (s, start, len) => fn(s, start, len)); } catch (e) {}
+  });
+}
+
+// Removes every table in the active database. Used for "DROP DATABASE ..."
+// since this in-browser engine only ever has one active database rather
+// than a whole server full of them.
+function dropAllTables() {
+  const tables = db.exec(`SELECT name FROM sqlite_master WHERE type='table';`);
+  if (tables.length) tables[0].values.forEach(r => db.run(`DROP TABLE IF EXISTS ${quoteIdent(r[0])};`));
+}
+
+let activeDatabaseName = null;
+
+// Rewrites the handful of statements that don't map onto SQLite as-is:
+//  - CREATE DATABASE / DROP DATABASE / USE — handled as bookkeeping, since
+//    this editor only ever has one active database.
+//  - DESC / DESCRIBE table — turned into a SELECT over pragma_table_info()
+//    so it renders in the results grid the way MySQL's DESCRIBE does.
+// Returns { sql, notices }: `sql` is what actually gets sent to db.exec().
+function preprocessSql(rawSql) {
+  const statements = splitStatements(rawSql);
+  const kept = [];
+  const notices = [];
+
+  statements.forEach(stmt => {
+    let s = stmt;
+
+    let m = s.match(/^\s*CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      activeDatabaseName = m[1];
+      notices.push(`Database "${m[1]}" ready — this editor works with one active database, so CREATE DATABASE just names it.`);
+      return;
+    }
+    m = s.match(/^\s*DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      dropAllTables();
+      if (activeDatabaseName === m[1]) activeDatabaseName = null;
+      notices.push(`Database "${m[1]}" dropped — every table in this workspace was removed.`);
+      return;
+    }
+    m = s.match(/^\s*USE\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      activeDatabaseName = m[1];
+      notices.push(`Now using database "${m[1]}".`);
+      return;
+    }
+    m = s.match(/^\s*(?:DESC|DESCRIBE)\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    if (m) {
+      const t = m[1].replace(/'/g, "''");
+      s = `SELECT name AS "Field", type AS "Type", CASE WHEN "notnull" = 0 THEN 'YES' ELSE 'NO' END AS "Null", CASE WHEN pk > 0 THEN 'PRI' ELSE '' END AS "Key", dflt_value AS "Default" FROM pragma_table_info('${t}')`;
+    }
+
+    kept.push(s);
+  });
+
+  return { sql: kept.length ? kept.join(';\n') + ';' : '', notices };
+}
+
 function runQuery() {
   if (!engineReady) { statusText.textContent = 'Engine still loading…'; statusText.className = 'status'; return; }
   const sql = cm.getValue().trim();
@@ -676,7 +808,8 @@ function runQuery() {
 
   const started = performance.now();
   try {
-    const results = db.exec(sql);
+    const { sql: execSql, notices } = preprocessSql(sql);
+    const results = execSql ? db.exec(execSql) : [];
     const elapsed = (performance.now() - started).toFixed(1);
     if (/\b(CREATE|DROP|ALTER|INSERT|UPDATE|DELETE|TRUNCATE|REPLACE)\b/i.test(sql)) renderSchema();
     pushHistory(sql, true);
@@ -691,7 +824,7 @@ function runQuery() {
       lastResultForExport = null;
       resultTabs.style.display = 'none';
       filterInput.style.display = 'none';
-      statusText.textContent = 'Executed — no rows returned';
+      statusText.textContent = notices.length ? notices.join(' ') : 'Executed — no rows returned';
       statusText.className = 'status ok';
       metaText.textContent = `${elapsed} ms`;
       resultsBody.innerHTML = '';
@@ -699,7 +832,9 @@ function runQuery() {
       empty.className = 'empty-state';
       empty.innerHTML = '<div class="glyph">ok</div>';
       const p = document.createElement('p');
-      p.textContent = "Statement ran successfully. This kind of query (insert / update / ddl) doesn't return a result set — try a SELECT to see rows here.";
+      p.textContent = notices.length
+        ? notices.join(' ')
+        : "Statement ran successfully. This kind of query (insert / update / ddl) doesn't return a result set — try a SELECT to see rows here.";
       empty.appendChild(p);
       resultsBody.appendChild(empty);
       return;
@@ -708,6 +843,7 @@ function runQuery() {
     metaText.textContent = `${elapsed} ms`;
     renderResultTabs();
     showActiveResult();
+    if (notices.length) statusText.textContent = notices.join(' ') + ' — ' + statusText.textContent;
   } catch (e) {
     pushHistory(sql, false);
     statusText.textContent = 'Query failed';
@@ -875,6 +1011,8 @@ document.getElementById('btnReset').addEventListener('click', () => {
   if (!confirm('Drop everything and start from a blank database? This discards every table and row you created.')) return;
   db.close();
   db = new SQL.Database();
+  registerCustomFunctions(db);
+  activeDatabaseName = null;
   renderSchema();
   resultSets = [];
   statusText.textContent = 'Database cleared — back to blank';
@@ -941,6 +1079,7 @@ document.getElementById('fileOpenDb').addEventListener('change', async (ev) => {
     const buf = new Uint8Array(await file.arrayBuffer());
     db.close();
     db = new SQL.Database(buf);
+    registerCustomFunctions(db);
     renderSchema();
     statusText.textContent = `Loaded ${file.name}`;
     statusText.className = 'status ok';
