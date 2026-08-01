@@ -214,6 +214,35 @@ This is a single static HTML file with no build step:
 
 Or just use the hosted version: **https://asrbmy.github.io/kvsql/**
 
+## Data types
+
+SQLite doesn't enforce strict column types the way MySQL does — it accepts **any** type name in a column definition and infers a storage affinity from it (e.g. a name containing `INT` gets integer affinity, `CHAR`/`TEXT`/`CLOB` gets text affinity, `REAL`/`FLOA`/`DOUB` gets real affinity, otherwise numeric affinity). Practically, that means all of these just work as column types with no changes needed:
+
+- **Numeric:** `INT`, `TINYINT`, `SMALLINT`, `MEDIUMINT`, `BIGINT`, `FLOAT`, `DOUBLE`, `DECIMAL`
+- **Character:** `CHAR`, `VARCHAR`, `TEXT`, `BLOB`
+- **Date & time:** `DATE`, `TIME`, `DATETIME`, `TIMESTAMP`, `YEAR`
+
+One exception: **`ENUM('a', 'b', 'c')`** isn't valid SQLite syntax (its type grammar doesn't accept a quoted value list in parentheses). It's shimmed — rewritten to `TEXT` plus a matching `CHECK` constraint:
+
+```sql
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  status ENUM('pending', 'shipped', 'delivered') DEFAULT 'pending'
+);
+```
+becomes, under the hood:
+```sql
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  status TEXT CHECK(status IN ('pending', 'shipped', 'delivered')) DEFAULT 'pending'
+);
+```
+Querying and inserting into `orders` works exactly as you'd expect — invalid values are rejected by the `CHECK` constraint the same way MySQL would reject an out-of-range `ENUM` value.
+
+## SQL objects & vocabulary
+
+`DATABASE`, `TABLE`, `COLUMN`, `ROW`, `RECORD`, `FIELD`, `VIEW`, `INDEX`, and `CONSTRAINT` aren't standalone commands — they're the nouns used throughout the DDL above (`CREATE TABLE`, `ALTER TABLE ... ADD COLUMN`, `CREATE VIEW`, `CREATE INDEX`, `PRIMARY KEY`/`FOREIGN KEY`/`CHECK` constraints, etc.), all covered in the sections above.
+
 ## Limitations
 
 - One active database per session — `CREATE DATABASE` doesn't create a genuinely separate, isolated database.

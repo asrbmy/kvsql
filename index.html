@@ -876,11 +876,13 @@ let lastResultForExport = null;
 // doesn't ship with: CONCAT(), CEIL()/CEILING()/FLOOR(), SIGN(), SQRT(),
 // TRUNCATE() (numeric), CURDATE(), CURRENT_DATE(), SYSDATE(), DAYOFMONTH(),
 // DAYOFWEEK(), DAYOFYEAR(), DESC/DESCRIBE, SHOW TABLES/SHOW DATABASES/
-// SHOW COLUMNS FROM, TRUNCATE TABLE, RENAME TABLE, AUTO_INCREMENT, DUAL,
-// SOURCE, and a CREATE DATABASE / DROP DATABASE / USE shim. CROSS/INNER/
-// LEFT/RIGHT/NATURAL JOIN, implicit (comma) joins, table aliases, IF EXISTS/
-// IF NOT EXISTS, ON DELETE/UPDATE CASCADE, and ALL are all native SQLite
-// syntax already.
+// SHOW COLUMNS FROM, TRUNCATE TABLE, RENAME TABLE, AUTO_INCREMENT, ENUM(),
+// DUAL, SOURCE, and a CREATE DATABASE / DROP DATABASE / USE shim. CROSS/
+// INNER/LEFT/RIGHT/NATURAL JOIN, implicit (comma) joins, table aliases,
+// IF EXISTS/IF NOT EXISTS, ON DELETE/UPDATE CASCADE, ALL, and every numeric/
+// character/date-time type name (INT, TINYINT, VARCHAR, DECIMAL, DATETIME,
+// etc.) are all native SQLite syntax already — SQLite accepts any type name
+// in a column definition and infers storage affinity from it.
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -1091,6 +1093,11 @@ function preprocessSql(rawSql) {
     // INTEGER PRIMARY KEY in SQLite's syntax, unlike MySQL's freer column order).
     if (/^\s*CREATE\s+TABLE\b/i.test(s)) {
       s = s.replace(/\bAUTO_INCREMENT\b/gi, 'AUTOINCREMENT');
+      // MySQL's ENUM('a','b',...) -> TEXT with a CHECK constraint restricting
+      // the allowed values, since SQLite's column-type grammar doesn't accept
+      // a quoted string list in parentheses the way MySQL's ENUM does.
+      s = s.replace(/([`"']?[A-Za-z_][A-Za-z0-9_]*[`"']?)\s+ENUM\s*\(([^)]*)\)/gi,
+        (full, col, values) => `${col} TEXT CHECK(${col} IN (${values}))`);
     }
     // MySQL's CURRENT_DATE() -> SQLite's CURRENT_DATE keyword literal (no parens allowed).
     s = s.replace(/\bCURRENT_DATE\s*\(\s*\)/gi, 'CURRENT_DATE');
