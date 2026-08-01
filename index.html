@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
@@ -304,6 +305,114 @@
     .table-export-btn{ opacity:1; } /* no hover on touch — always show the export icon */
     button, .col-row, .result-tab{ min-height:30px; }
   }
+
+  /* ---------- Light theme ---------- */
+  body.light-theme{
+    --bg:#F5F3EE; --surface:#FFFFFF; --surface-2:#EFEBE3; --line-soft:#DDD6C7;
+    --text:#2B2620; --text-dim:#6B6255; --text-faint:#A39A88;
+    --accent:#B8791E; --accent-soft:rgba(184,121,30,0.12);
+    --teal:#2E7D72; --teal-soft:rgba(46,125,114,0.12);
+    --error:#B23A22; --error-soft:rgba(178,58,34,0.10);
+  }
+  body.light-theme .CodeMirror{ background:var(--bg); }
+
+  /* ---------- Query tab bar ---------- */
+  .query-tabbar{
+    display:flex; align-items:center; gap:2px; padding:6px 10px 0;
+    background:var(--bg); border-bottom:1px solid var(--line-soft); flex-shrink:0; overflow-x:auto; scrollbar-width:none;
+  }
+  .query-tabbar::-webkit-scrollbar{ display:none; }
+  .query-tab{
+    display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:6px 6px 0 0;
+    font-family:var(--mono); font-size:11.5px; color:var(--text-dim); cursor:pointer;
+    border:1px solid transparent; border-bottom:none; white-space:nowrap; max-width:160px;
+  }
+  .query-tab .qt-name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .query-tab.active{ background:var(--surface); color:var(--text); border-color:var(--line-soft); }
+  .query-tab .qt-close{ opacity:0.5; width:13px; height:13px; flex-shrink:0; border-radius:3px; }
+  .query-tab .qt-close:hover{ opacity:1; background:var(--error-soft); color:var(--error); }
+  .query-tab-add{
+    padding:6px 9px; color:var(--text-faint); cursor:pointer; font-family:var(--mono); font-size:14px; border-radius:5px;
+  }
+  .query-tab-add:hover{ background:var(--surface-2); color:var(--text); }
+
+  /* ---------- Dropdown panels (snippets / sample data) ---------- */
+  .dropdown-wrap{ position:relative; }
+  .dropdown-panel{
+    display:none; position:absolute; top:calc(100% + 6px); left:0; min-width:230px; max-width:300px;
+    background:var(--surface); border:1px solid var(--line-soft); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.35);
+    z-index:30; padding:6px; max-height:320px; overflow-y:auto;
+  }
+  .dropdown-panel.open{ display:block; }
+  .dropdown-item{
+    padding:8px 10px; border-radius:5px; font-family:var(--sans); font-size:12.5px; color:var(--text);
+    cursor:pointer; display:flex; flex-direction:column; gap:2px;
+  }
+  .dropdown-item:hover{ background:var(--surface-2); }
+  .dropdown-item .di-title{ font-weight:600; }
+  .dropdown-item .di-sub{ font-family:var(--mono); font-size:10.5px; color:var(--text-faint); }
+  .dropdown-item .di-del{ margin-left:auto; }
+  .dropdown-head{
+    padding:6px 10px; font-family:var(--mono); font-size:10px; color:var(--text-faint);
+    text-transform:uppercase; letter-spacing:0.06em; display:flex; justify-content:space-between; align-items:center;
+  }
+  .dropdown-empty{ padding:10px; font-size:11.5px; color:var(--text-faint); }
+
+  /* ---------- Modal overlay (tutorial / ER diagram) ---------- */
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:60;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{
+    background:var(--surface); border:1px solid var(--line-soft); border-radius:10px;
+    width:min(720px, 100%); max-height:85vh; display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
+    border-bottom:1px solid var(--line-soft); flex-shrink:0;
+  }
+  .modal-head h2{ font-size:14px; margin:0; font-weight:600; }
+  .modal-close{ cursor:pointer; color:var(--text-faint); padding:4px; border-radius:5px; }
+  .modal-close:hover{ background:var(--surface-2); color:var(--text); }
+  .modal-body{ padding:18px; overflow-y:auto; font-size:13px; line-height:1.6; }
+  .modal-foot{
+    display:flex; justify-content:space-between; gap:8px; padding:12px 18px;
+    border-top:1px solid var(--line-soft); flex-shrink:0;
+  }
+
+  /* ---------- Hover tooltip for keywords/functions ---------- */
+  .sql-tooltip{
+    display:none; position:fixed; z-index:70; max-width:280px; background:var(--surface-2);
+    border:1px solid var(--line-soft); border-radius:6px; padding:9px 11px; font-family:var(--sans);
+    font-size:11.5px; line-height:1.5; color:var(--text); box-shadow:0 8px 24px rgba(0,0,0,0.4); pointer-events:none;
+  }
+  .sql-tooltip .tt-name{ font-family:var(--mono); color:var(--teal); font-weight:700; margin-bottom:3px; }
+  .sql-tooltip .tt-example{ font-family:var(--mono); color:var(--accent); font-size:10.5px; margin-top:4px; }
+  .sql-tooltip .tt-dialect{ color:var(--text-faint); font-size:10px; margin-top:4px; font-style:italic; }
+
+  /* ---------- Editable results cells ---------- */
+  table.grid tbody td.editable{ cursor:text; }
+  table.grid tbody td.editable:hover{ outline:1px dashed var(--teal); outline-offset:-2px; }
+  table.grid tbody td input.cell-edit{
+    width:100%; background:var(--surface); color:var(--text); border:1px solid var(--teal);
+    border-radius:3px; font-family:var(--mono); font-size:12.5px; padding:2px 5px;
+  }
+
+  /* ---------- Performance tip banner ---------- */
+  .perf-tip{
+    font-family:var(--sans); font-size:11.5px; color:var(--text-dim); background:var(--accent-soft);
+    border-top:1px solid var(--line-soft); padding:7px 16px; display:flex; align-items:center; gap:7px;
+  }
+  .perf-tip svg{ width:13px; height:13px; color:var(--accent); flex-shrink:0; }
+
+  /* ---------- Session restore banner ---------- */
+  .session-banner{
+    font-family:var(--sans); font-size:11.5px; color:var(--text-dim); background:var(--teal-soft);
+    border-bottom:1px solid var(--line-soft); padding:7px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0;
+  }
+    .CodeMirror .cm-error-line{ background:var(--error-soft) !important; }
 </style>
 </head>
 <body>
@@ -325,6 +434,21 @@
     </div>
   </div>
   <div class="header-actions">
+    <select id="dialectSelect" class="ghost" title="Hint dialect for tooltips (engine is always SQLite)" style="padding:7px 8px;">
+      <option value="mysql">MySQL hints</option>
+      <option value="postgres">PostgreSQL hints</option>
+    </select>
+    <button class="ghost icon-only" id="btnTheme" title="Toggle light / dark theme">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <button class="ghost" id="btnLearn" title="Guided SQL walkthrough">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      <span class="btn-label">Learn</span>
+    </button>
+    <button class="ghost" id="btnShare" title="Copy a shareable link to this query">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-3.9M8.6 13.5l6.8 3.9"/></svg>
+      <span class="btn-label">Share</span>
+    </button>
     <button class="ghost" id="btnExport" title="Export results as CSV">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l4-4m-4 4l-4-4M4 19h16"/></svg>
       <span class="btn-label">Export CSV</span>
@@ -344,12 +468,21 @@
 
 <div class="shell">
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-head"><span>Schema</span><span id="tableCount"></span></div>
+    <div class="sidebar-head">
+      <span>Schema</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span id="tableCount"></span>
+        <span id="btnErDiagram" title="View ER diagram" style="cursor:pointer; display:flex;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 6h4a2 2 0 012 2v6"/></svg>
+        </span>
+      </span>
+    </div>
     <div class="table-list" id="tableList"></div>
     <div class="sidebar-foot">Tables you create will show up here · <code>Ctrl+Space</code> for autocomplete</div>
   </aside>
 
   <div class="main">
+    <div class="session-banner" id="sessionBanner" style="display:none;"></div>
     <div class="toolbar">
       <div class="toolbar-scroll">
       <button class="ghost" id="btnFormat" title="Tidy up whitespace">
@@ -385,12 +518,33 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l4-4m-4 4l-4-4"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
         <span class="btn-label">Import CSV</span>
       </button>
+      <span class="toolbar-divider"></span>
+      <div class="dropdown-wrap">
+        <button class="ghost" id="btnSnippets" title="Saved query snippets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-4"/><path d="M18.4 2.6a2 2 0 112.8 2.8L11 15.7 7 17l1.3-4z"/></svg>
+          <span class="btn-label">Snippets</span>
+        </button>
+        <div class="dropdown-panel" id="snippetsPanel"></div>
+      </div>
+      <div class="dropdown-wrap">
+        <button class="ghost" id="btnSampleData" title="Load a sample dataset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+          <span class="btn-label">Sample Data</span>
+        </button>
+        <div class="dropdown-panel" id="sampleDataPanel"></div>
+      </div>
+      <button class="ghost" id="btnExportSchema" title="Download CREATE-statement-only schema dump">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+        <span class="btn-label">Export Schema</span>
+      </button>
       <input type="file" id="fileOpenSql" accept=".sql,.txt" style="display:none;">
       <input type="file" id="fileOpenDb" accept=".sqlite,.db,.sqlite3" style="display:none;">
       <input type="file" id="fileImportCsv" accept=".csv" style="display:none;">
       </div>
       <div class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> to run</div>
     </div>
+
+    <div class="query-tabbar" id="queryTabbar"></div>
 
     <div class="editor-wrap" id="editorWrap">
       <textarea id="editor"></textarea>
@@ -404,6 +558,7 @@
         <input type="text" id="filterInput" placeholder="Filter rows…" style="display:none;">
         <span class="meta" id="metaText"></span>
       </div>
+      <div class="perf-tip" id="perfTip" style="display:none;"></div>
       <div class="results-body" id="resultsBody">
         <div class="empty-state">
           <div class="glyph">┌─┬─┐<br>├─┼─┤<br>└─┴─┘</div>
@@ -418,6 +573,21 @@
     </div>
   </div>
 </div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="modalTitle"></h2>
+      <span class="modal-close" id="modalClose">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </span>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="sql-tooltip" id="sqlTooltip"></div>
 
 <script>
 // Boilerplate shown in the editor on load — nothing is pre-created in the
@@ -451,6 +621,17 @@ let sortState = { col: -1, dir: 1 };
 let filterText = '';
 const ROW_CAP = 500;        // cap DOM rows so a huge SELECT can't freeze the tab
 
+// ---------- New feature state (tabs, snippets, theme, dialect) ----------
+const LS_TABS = 'kvsql_tabs_v1';
+const LS_DB = 'kvsql_db_v1';
+const LS_SNIPPETS = 'kvsql_snippets_v1';
+const LS_THEME = 'kvsql_theme_v1';
+const LS_DIALECT = 'kvsql_dialect_v1';
+let queryTabs = [];
+let activeQueryTabId = null;
+let nextQueryTabId = 1;
+let currentDialect = 'mysql';
+
 const loadingScreen = document.getElementById('loadingScreen');
 const tableList = document.getElementById('tableList');
 const tableCount = document.getElementById('tableCount');
@@ -464,6 +645,17 @@ const btnRun = document.getElementById('btnRun');
 const sidebar = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 const editorWrap = document.getElementById('editorWrap');
+const queryTabbar = document.getElementById('queryTabbar');
+const snippetsPanel = document.getElementById('snippetsPanel');
+const sampleDataPanel = document.getElementById('sampleDataPanel');
+const sessionBanner = document.getElementById('sessionBanner');
+const perfTip = document.getElementById('perfTip');
+const modalOverlay = document.getElementById('modalOverlay');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const modalFoot = document.getElementById('modalFoot');
+const sqlTooltip = document.getElementById('sqlTooltip');
+const dialectSelect = document.getElementById('dialectSelect');
 
 const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
   mode: 'text/x-sql',
@@ -479,14 +671,25 @@ const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
     'Ctrl-Space': 'autocomplete'
   }
 });
-cm.setValue(BOILERPLATE_SQL);
+initQueryTabsAndSession();
 
 initDB();
 
 async function initDB() {
   try {
     SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` });
-    db = new SQL.Database();
+    let restored = false;
+    if (!location.hash.startsWith('#q=')) {
+      try {
+        const savedDb = localStorage.getItem(LS_DB);
+        if (savedDb) {
+          const bytes = Uint8Array.from(atob(savedDb), c => c.charCodeAt(0));
+          db = new SQL.Database(bytes);
+          restored = true;
+        }
+      } catch (e) { /* ignore a corrupted autosave and fall back to a blank database */ }
+    }
+    if (!restored) db = new SQL.Database();
     registerCustomFunctions(db);
     engineReady = true;
     btnRun.disabled = false;
@@ -670,9 +873,14 @@ let lastResultForExport = null;
 // and constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK, DEFAULT),
 // CREATE VIEW, CREATE INDEX — all already work natively, no changes needed.
 // Everything below fills in the handful of MySQL-flavored commands SQLite
-// doesn't ship with: CONCAT(), CEIL()/CEILING()/FLOOR(), DESC/DESCRIBE,
-// SHOW TABLES/SHOW DATABASES/SHOW COLUMNS FROM, TRUNCATE, AUTO_INCREMENT,
-// and a CREATE DATABASE / DROP DATABASE / USE shim.
+// doesn't ship with: CONCAT(), CEIL()/CEILING()/FLOOR(), SIGN(), SQRT(),
+// TRUNCATE() (numeric), CURDATE(), CURRENT_DATE(), SYSDATE(), DAYOFMONTH(),
+// DAYOFWEEK(), DAYOFYEAR(), DESC/DESCRIBE, SHOW TABLES/SHOW DATABASES/
+// SHOW COLUMNS FROM, TRUNCATE TABLE, RENAME TABLE, AUTO_INCREMENT, DUAL,
+// SOURCE, and a CREATE DATABASE / DROP DATABASE / USE shim. CROSS/INNER/
+// LEFT/RIGHT/NATURAL JOIN, implicit (comma) joins, table aliases, IF EXISTS/
+// IF NOT EXISTS, ON DELETE/UPDATE CASCADE, and ALL are all native SQLite
+// syntax already.
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -750,10 +958,34 @@ function registerCustomFunctions(database) {
     CEIL: (x) => x === null ? null : Math.ceil(x),
     CEILING: (x) => x === null ? null : Math.ceil(x),
     FLOOR: (x) => x === null ? null : Math.floor(x),
+    SIGN: (x) => x === null ? null : Math.sign(x),
+    SQRT: (x) => (x === null || x < 0) ? null : Math.sqrt(x),
+    CURDATE: () => formatNow().slice(0, 10),
+    SYSDATE: () => formatNow(),
+    DAYOFMONTH: (d) => { const p = parseSqlDate(d); return p ? p.getUTCDate() : null; },
+    DAYOFWEEK: (d) => { const p = parseSqlDate(d); return p ? p.getUTCDay() + 1 : null; }, // MySQL: 1=Sunday..7=Saturday
+    DAYOFYEAR: (d) => {
+      const p = parseSqlDate(d);
+      if (!p) return null;
+      const start = Date.UTC(p.getUTCFullYear(), 0, 1);
+      return Math.floor((p.getTime() - start) / 86400000) + 1;
+    },
   };
   Object.entries(defs).forEach(([name, fn]) => {
     try { database.create_function(name, fn); } catch (e) { console.warn(`Could not register ${name}()`, e); }
   });
+  // TRUNCATE(x[, d]) — numeric truncation toward zero to d decimal places
+  // (defaults to 0). Registered separately from the destructive TRUNCATE
+  // TABLE statement, which is handled in preprocessSql instead.
+  const numTruncate = (x, d) => {
+    if (x === null) return null;
+    const digits = d === undefined || d === null ? 0 : Math.trunc(d);
+    const factor = Math.pow(10, digits);
+    const sign = x < 0 ? -1 : 1;
+    return sign * Math.floor(Math.abs(x) * factor) / factor;
+  };
+  try { database.create_function('TRUNCATE', (x) => numTruncate(x)); } catch (e) {}
+  try { database.create_function('TRUNCATE', (x, d) => numTruncate(x, d)); } catch (e) {}
   // MID() / SUBSTRING() are registered in both 2-arg and 3-arg forms —
   // SQLite allows the same function name to be overloaded by argument count.
   [['MID', mysqlSubstr], ['SUBSTRING', mysqlSubstr]].forEach(([name, fn]) => {
@@ -836,11 +1068,32 @@ function preprocessSql(rawSql) {
       kept.push(`DELETE FROM ${quoteIdent(m[1])}`);
       return;
     }
+    // MySQL's RENAME TABLE a TO b [, c TO d, ...] -> SQLite's ALTER TABLE ... RENAME TO ...
+    m = s.match(/^\s*RENAME\s+TABLE\s+(.+)$/i);
+    if (m) {
+      const pairs = m[1].split(',').map(p => p.trim()).filter(Boolean);
+      const alters = [];
+      pairs.forEach(pair => {
+        const pm = pair.match(/^[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s+TO\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?$/i);
+        if (pm) alters.push(`ALTER TABLE ${quoteIdent(pm[1])} RENAME TO ${quoteIdent(pm[2])}`);
+      });
+      if (alters.length) { alters.forEach(a => kept.push(a)); return; }
+    }
+    // MySQL client-only SOURCE command reads a file from the server's
+    // filesystem — there's no equivalent in a browser sandbox.
+    if (/^\s*SOURCE\s+\S/i.test(s)) {
+      notices.push(`SOURCE isn't available here (a browser SQL editor has no filesystem access) — use the "Open .sql" button in the toolbar to load a script file instead.`);
+      return;
+    }
+    // MySQL's DUAL is a dummy one-row table; SQLite just needs no FROM at all.
+    s = s.replace(/\bFROM\s+DUAL\b/gi, '');
     // MySQL's AUTO_INCREMENT -> SQLite's AUTOINCREMENT (only follows
     // INTEGER PRIMARY KEY in SQLite's syntax, unlike MySQL's freer column order).
     if (/^\s*CREATE\s+TABLE\b/i.test(s)) {
       s = s.replace(/\bAUTO_INCREMENT\b/gi, 'AUTOINCREMENT');
     }
+    // MySQL's CURRENT_DATE() -> SQLite's CURRENT_DATE keyword literal (no parens allowed).
+    s = s.replace(/\bCURRENT_DATE\s*\(\s*\)/gi, 'CURRENT_DATE');
 
     kept.push(s);
   });
@@ -848,10 +1101,21 @@ function preprocessSql(rawSql) {
   return { sql: kept.length ? kept.join(';\n') + ';' : '', notices };
 }
 
+function detectEditableTable(stmt) {
+  if (!/^\s*SELECT\s+\*\s+FROM\s+[`"']?[A-Za-z_][A-Za-z0-9_]*[`"']?/i.test(stmt)) return null;
+  if (/\b(JOIN|GROUP\s+BY|UNION|DISTINCT|COUNT\s*\(|SUM\s*\(|AVG\s*\(|MIN\s*\(|MAX\s*\()\b/i.test(stmt)) return null;
+  const m = stmt.match(/^\s*SELECT\s+\*\s+FROM\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?/i);
+  return m ? m[1] : null;
+}
+
+let editableInfo = null; // { table } — set when the last run was a plain "SELECT * FROM table" so cells can be edited inline
+
 function runQuery() {
   if (!engineReady) { statusText.textContent = 'Engine still loading…'; statusText.className = 'status'; return; }
   const sql = cm.getValue().trim();
   if (!sql) return;
+  clearErrorMarks();
+  perfTip.style.display = 'none';
 
   const statements = splitStatements(sql);
   const destructive = statements.filter(isDestructive);
@@ -868,7 +1132,31 @@ function runQuery() {
   const started = performance.now();
   try {
     const { sql: execSql, notices } = preprocessSql(sql);
-    const results = execSql ? db.exec(execSql) : [];
+
+    // If this is exactly one plain "SELECT * FROM table" statement, quietly
+    // fetch rowid alongside so results can be edited inline in the grid.
+    editableInfo = null;
+    let finalExecSql = execSql;
+    if (execSql) {
+      const cleanStmts = splitStatements(execSql);
+      if (cleanStmts.length === 1) {
+        const t = detectEditableTable(cleanStmts[0]);
+        if (t) finalExecSql = cleanStmts[0].replace(/SELECT\s+\*\s+FROM/i, 'SELECT rowid AS __rowid__, * FROM') + ';';
+      }
+    }
+
+    const results = finalExecSql ? db.exec(finalExecSql) : [];
+
+    // Strip the smuggled-in rowid back out of the display columns, but keep
+    // it as a trailing (hidden) element on each row for edit commits.
+    if (results.length === 1 && results[0].columns[0] === '__rowid__') {
+      const t = detectEditableTable(splitStatements(execSql)[0] || '');
+      const res0 = results[0];
+      res0.columns = res0.columns.slice(1);
+      res0.values = res0.values.map(r => { const rid = r[0]; const rest = r.slice(1); rest.push(rid); return rest; });
+      editableInfo = { table: t };
+    }
+
     const elapsed = (performance.now() - started).toFixed(1);
     if (/\b(CREATE|DROP|ALTER|INSERT|UPDATE|DELETE|TRUNCATE|REPLACE)\b/i.test(sql)) renderSchema();
     pushHistory(sql, true);
@@ -896,6 +1184,7 @@ function runQuery() {
         : "Statement ran successfully. This kind of query (insert / update / ddl) doesn't return a result set — try a SELECT to see rows here.";
       empty.appendChild(p);
       resultsBody.appendChild(empty);
+      autosaveSession();
       return;
     }
 
@@ -903,6 +1192,8 @@ function runQuery() {
     renderResultTabs();
     showActiveResult();
     if (notices.length) statusText.textContent = notices.join(' ') + ' — ' + statusText.textContent;
+    showPerfTip(sql);
+    autosaveSession();
   } catch (e) {
     pushHistory(sql, false);
     statusText.textContent = 'Query failed';
@@ -916,7 +1207,84 @@ function runQuery() {
     box.className = 'error-box';
     box.textContent = e.message || String(e);
     resultsBody.appendChild(box);
+    highlightErrorLine(sql, e.message || String(e));
   }
+}
+
+// ---------- Inline error highlighting ----------
+// SQLite error messages often include the offending fragment as
+// `near "TOKEN": syntax error`. We look that fragment up in the editor text
+// and highlight the line it appears on — an approximation (no real column
+// data comes back from sql.js), but usually points at the right spot.
+let errorLineHandle = null;
+function clearErrorMarks() {
+  if (errorLineHandle !== null) { cm.removeLineClass(errorLineHandle, 'background', 'cm-error-line'); errorLineHandle = null; }
+}
+function highlightErrorLine(sql, message) {
+  const m = message.match(/near "([^"]+)"/i) || message.match(/near '([^']+)'/i);
+  const needle = m ? m[1] : null;
+  const text = cm.getValue();
+  let idx = -1;
+  if (needle) idx = text.toLowerCase().indexOf(needle.toLowerCase());
+  if (idx === -1) {
+    // Fall back: table/column "already exists" or "no such table/column" errors name the identifier directly.
+    const m2 = message.match(/no such (?:table|column):\s*(\S+)/i) || message.match(/table\s+"?(\w+)"?\s+already exists/i);
+    if (m2) idx = text.toLowerCase().indexOf(m2[1].toLowerCase());
+  }
+  if (idx === -1) return;
+  const before = text.slice(0, idx);
+  const line = before.split('\n').length - 1;
+  errorLineHandle = line;
+  cm.addLineClass(line, 'background', 'cm-error-line');
+  cm.scrollIntoView({ line, ch: 0 }, 60);
+}
+
+// ---------- Lightweight performance tips ----------
+// Heuristic, not a real query planner reading — just nudges toward common
+// SQLite/MySQL habits worth knowing about.
+function showPerfTip(sql) {
+  const tip = computePerfTip(sql);
+  if (!tip) { perfTip.style.display = 'none'; return; }
+  perfTip.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z"/><path d="M10 21h4"/></svg><span>${escapeHtml(tip)}</span>`;
+  perfTip.style.display = 'flex';
+}
+function computePerfTip(sql) {
+  try {
+    const stmts = splitStatements(sql).filter(s => /^\s*SELECT\b/i.test(s));
+    for (const s of stmts) {
+      const m = s.match(/FROM\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?/i);
+      if (!m) continue;
+      const table = m[1];
+      let rowCount = 0;
+      try {
+        const r = db.exec(`SELECT COUNT(*) FROM ${quoteIdent(table)};`);
+        rowCount = r.length ? r[0].values[0][0] : 0;
+      } catch (e) { continue; }
+      if (rowCount < 500) continue;
+      if (/SELECT\s+\*/i.test(s) && !/LIMIT\s+\d+/i.test(s)) {
+        return `${table} has ${rowCount} rows — consider selecting only the columns you need and adding a LIMIT.`;
+      }
+      const whereMatch = s.match(/WHERE\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*(=|>|<|>=|<=|LIKE|BETWEEN)/i);
+      if (whereMatch) {
+        const col = whereMatch[1];
+        const idxRes = db.exec(`PRAGMA index_list(${quoteIdent(table)});`);
+        let indexed = false;
+        if (idxRes.length) {
+          for (const row of idxRes[0].values) {
+            const idxName = row[1];
+            const cols = db.exec(`PRAGMA index_info(${quoteIdent(idxName)});`);
+            if (cols.length && cols[0].values.some(c => c[2] === col)) { indexed = true; break; }
+          }
+        }
+        const pk = db.exec(`PRAGMA table_info(${quoteIdent(table)});`);
+        const isPk = pk.length && pk[0].values.some(c => c[1] === col && c[5] > 0);
+        if (!indexed && !isPk) {
+          return `Filtering ${table} by "${col}" on ${rowCount} rows with no index — CREATE INDEX ON ${table}(${col}) would speed this up.`;
+        }
+      }
+    }
+  } catch (e) { /* best-effort only */ }
+  return null;
 }
 
 function renderResultTabs() {
@@ -952,7 +1320,8 @@ function getFilteredSortedRows(res) {
   let rows = res.values;
   if (filterText) {
     const needle = filterText.toLowerCase();
-    rows = rows.filter(row => row.some(cell => cell !== null && String(cell).toLowerCase().includes(needle)));
+    const n = res.columns.length;
+    rows = rows.filter(row => row.slice(0, n).some(cell => cell !== null && String(cell).toLowerCase().includes(needle)));
   }
   if (sortState.col >= 0) {
     const c = sortState.col, dir = sortState.dir;
@@ -966,6 +1335,49 @@ function getFilteredSortedRows(res) {
     });
   }
   return rows;
+}
+
+function beginCellEdit(td, row, colIdx, columns) {
+  if (td.querySelector('input')) return;
+  const original = row[colIdx];
+  const input = document.createElement('input');
+  input.className = 'cell-edit';
+  input.value = original === null ? '' : original;
+  td.textContent = '';
+  td.className = 'editable';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+  let settled = false;
+  const commit = () => {
+    if (settled) return;
+    settled = true;
+    const newVal = input.value;
+    if (newVal === String(original === null ? '' : original)) {
+      td.textContent = original === null ? 'NULL' : original;
+      if (original === null) td.className = 'null editable'; else td.className = 'editable';
+      return;
+    }
+    const rowid = row[row.length - 1];
+    const colName = columns[colIdx];
+    try {
+      db.run(`UPDATE ${quoteIdent(editableInfo.table)} SET ${quoteIdent(colName)} = ? WHERE rowid = ?;`, [newVal, rowid]);
+      statusText.textContent = `Updated ${editableInfo.table}.${colName} (row ${rowid})`;
+      statusText.className = 'status ok';
+      renderSchema();
+      autosaveSession();
+      runQuery();
+    } catch (e) {
+      alert('Update failed: ' + (e.message || e));
+      td.textContent = original === null ? 'NULL' : original;
+      td.className = original === null ? 'null editable' : 'editable';
+    }
+  };
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') input.blur();
+    if (ev.key === 'Escape') { settled = true; input.blur(); td.textContent = original === null ? 'NULL' : original; td.className = original === null ? 'null editable' : 'editable'; }
+  });
+  input.addEventListener('blur', commit, { once: true });
 }
 
 function renderTable(res) {
@@ -1009,10 +1421,15 @@ function renderTable(res) {
     tdNum.className = 'rownum';
     tdNum.textContent = i + 1;
     tr.appendChild(tdNum);
-    row.forEach(cell => {
+    row.slice(0, columns.length).forEach((cell, colIdx) => {
       const td = document.createElement('td');
       if (cell === null) { td.className = 'null'; td.textContent = 'NULL'; }
       else td.textContent = cell;
+      if (editableInfo) {
+        td.classList.add('editable');
+        td.title = 'Double-click to edit this cell';
+        td.addEventListener('dblclick', () => beginCellEdit(td, row, colIdx, columns));
+      }
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -1024,6 +1441,12 @@ function renderTable(res) {
     const notice = document.createElement('div');
     notice.className = 'row-cap-notice';
     notice.textContent = `Showing first ${ROW_CAP} of ${rows.length} matching rows — refine your query or filter, or use Export CSV for the full set.`;
+    resultsBody.appendChild(notice);
+  }
+  if (editableInfo) {
+    const notice = document.createElement('div');
+    notice.className = 'row-cap-notice';
+    notice.textContent = `Editable: double-click any cell to update ${editableInfo.table} directly.`;
     resultsBody.appendChild(notice);
   }
 }
@@ -1101,7 +1524,7 @@ document.getElementById('btnExport').addEventListener('click', () => {
     if (/^[=+\-@]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = [columns.map(esc).join(','), ...values.map(row => row.map(esc).join(','))].join('\n');
+  const csv = [columns.map(esc).join(','), ...values.map(row => row.slice(0, columns.length).map(esc).join(','))].join('\n');
   downloadBlob(csv, 'query-results.csv', 'text/csv');
 });
 
@@ -1155,6 +1578,39 @@ document.getElementById('fileOpenDb').addEventListener('change', async (ev) => {
   ev.target.value = '';
 });
 
+// Looks at every value in a column (empty cells are ignored) and picks the
+// narrowest SQLite type that fits them all, so CSV imports get real
+// INTEGER/REAL/DATE columns instead of everything landing in TEXT.
+function inferCsvColumnTypes(colNames, dataRows) {
+  const INT_RE = /^-?\d+$/;
+  const REAL_RE = /^-?\d+\.\d+$/;
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  return colNames.map((_, i) => {
+    let sawValue = false, allInt = true, allReal = true, allDate = true;
+    for (const row of dataRows) {
+      const v = i < row.length ? row[i] : '';
+      if (v === null || v === undefined || String(v).trim() === '') continue;
+      sawValue = true;
+      const s = String(v).trim();
+      if (!INT_RE.test(s)) allInt = false;
+      if (!(INT_RE.test(s) || REAL_RE.test(s))) allReal = false;
+      if (!DATE_RE.test(s)) allDate = false;
+    }
+    if (!sawValue) return 'TEXT';
+    if (allInt) return 'INTEGER';
+    if (allReal) return 'REAL';
+    if (allDate) return 'DATE';
+    return 'TEXT';
+  });
+}
+function coerceCsvValue(v, type) {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  const s = String(v).trim();
+  if (type === 'INTEGER') return parseInt(s, 10);
+  if (type === 'REAL') return parseFloat(s);
+  return s;
+}
+
 document.getElementById('btnImportCsv').addEventListener('click', () => document.getElementById('fileImportCsv').click());
 document.getElementById('fileImportCsv').addEventListener('change', async (ev) => {
   const file = ev.target.files[0];
@@ -1184,19 +1640,21 @@ document.getElementById('fileImportCsv').addEventListener('change', async (ev) =
 
     if (!engineReady) { alert('The SQL engine is still loading — try again in a moment.'); return; }
 
+    const colTypes = inferCsvColumnTypes(colNames, dataRows);
+
     const existing = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name=${sqlStringLiteral(tableName)};`);
     if (existing.length && !confirm(`A table named "${tableName}" already exists. Drop it and reimport?`)) return;
 
     db.run('BEGIN TRANSACTION;');
     try {
       if (existing.length) db.run(`DROP TABLE ${safeTable};`);
-      const colDefs = colNames.map(c => `${quoteIdent(c)} TEXT`).join(', ');
+      const colDefs = colNames.map((c, i) => `${quoteIdent(c)} ${colTypes[i]}`).join(', ');
       db.run(`CREATE TABLE ${safeTable} (${colDefs});`);
 
       const placeholders = colNames.map(() => '?').join(', ');
       const stmt = db.prepare(`INSERT INTO ${safeTable} (${colNames.map(quoteIdent).join(', ')}) VALUES (${placeholders});`);
       dataRows.forEach(r => {
-        const padded = colNames.map((_, i) => (i < r.length ? r[i] : null));
+        const padded = colNames.map((_, i) => coerceCsvValue(i < r.length ? r[i] : null, colTypes[i]));
         stmt.run(padded);
       });
       stmt.free();
@@ -1209,7 +1667,7 @@ document.getElementById('fileImportCsv').addEventListener('change', async (ev) =
     renderSchema();
     cm.setValue(`SELECT * FROM ${safeTable} LIMIT 100;`);
     runQuery();
-    statusText.textContent = `Imported "${tableName}" — ${dataRows.length} row${dataRows.length === 1 ? '' : 's'}, all columns as TEXT`;
+    statusText.textContent = `Imported "${tableName}" — ${dataRows.length} row${dataRows.length === 1 ? '' : 's'}, types inferred (${colTypes.join(', ')})`;
     statusText.className = 'status ok';
   } catch (e) {
     statusText.textContent = 'Import failed';
@@ -1342,6 +1800,600 @@ document.getElementById('btnExplain').addEventListener('click', () => {
     box.className = 'error-box';
     box.textContent = e.message || String(e);
     resultsBody.appendChild(box);
+  }
+});
+
+// =====================================================================
+// Everything below is additive: query tabs, autosave, snippets, sample
+// datasets, schema export, theme + dialect toggles, hover tooltips, a
+// guided tutorial, an ER diagram, and shareable query links.
+// =====================================================================
+
+// ---------- Unicode-safe base64 (for shareable links) ----------
+function b64EncodeUnicode(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode('0x' + p1)));
+}
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(atob(str).split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''));
+}
+
+// ---------- Query tabs ----------
+function newTabObject(name, sql) { return { id: nextQueryTabId++, name, sql }; }
+
+function captureActiveTabSql() {
+  const t = queryTabs.find(t => t.id === activeQueryTabId);
+  if (t) t.sql = cm.getValue();
+}
+
+function switchToTab(id) {
+  captureActiveTabSql();
+  activeQueryTabId = id;
+  const t = queryTabs.find(t => t.id === id);
+  cm.setValue(t ? t.sql : '');
+  renderQueryTabs();
+  cm.focus();
+}
+
+function addQueryTab(sql) {
+  captureActiveTabSql();
+  const t = newTabObject(`Query ${queryTabs.length + 1}`, sql || '-- New query\n');
+  queryTabs.push(t);
+  activeQueryTabId = t.id;
+  cm.setValue(t.sql);
+  renderQueryTabs();
+  cm.focus();
+  autosaveSession();
+}
+
+function closeQueryTab(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (queryTabs.length === 1) return; // always keep at least one tab open
+  const idx = queryTabs.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  queryTabs.splice(idx, 1);
+  if (activeQueryTabId === id) {
+    const next = queryTabs[Math.max(0, idx - 1)];
+    activeQueryTabId = next.id;
+    cm.setValue(next.sql);
+  }
+  renderQueryTabs();
+  autosaveSession();
+}
+
+function renderQueryTabs() {
+  queryTabbar.innerHTML = '';
+  queryTabs.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'query-tab' + (t.id === activeQueryTabId ? ' active' : '');
+    const name = document.createElement('span');
+    name.className = 'qt-name';
+    name.textContent = t.name;
+    name.title = 'Double-click to rename';
+    name.addEventListener('dblclick', (ev) => {
+      ev.stopPropagation();
+      const next = prompt('Rename tab', t.name);
+      if (next && next.trim()) { t.name = next.trim().slice(0, 40); renderQueryTabs(); autosaveSession(); }
+    });
+    el.appendChild(name);
+    if (queryTabs.length > 1) {
+      const close = document.createElement('span');
+      close.className = 'qt-close';
+      close.textContent = '✕';
+      close.addEventListener('click', (ev) => closeQueryTab(t.id, ev));
+      el.appendChild(close);
+    }
+    el.addEventListener('click', () => { if (t.id !== activeQueryTabId) switchToTab(t.id); });
+    queryTabbar.appendChild(el);
+  });
+  const add = document.createElement('div');
+  add.className = 'query-tab-add';
+  add.textContent = '+';
+  add.title = 'New query tab';
+  add.addEventListener('click', () => addQueryTab());
+  queryTabbar.appendChild(add);
+}
+
+function showSessionBanner(msg) {
+  sessionBanner.style.display = 'flex';
+  sessionBanner.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  const link = document.createElement('a');
+  link.textContent = 'Start fresh instead';
+  link.addEventListener('click', () => {
+    try { localStorage.removeItem(LS_TABS); localStorage.removeItem(LS_DB); } catch (e) {}
+    location.hash = '';
+    location.reload();
+  });
+  sessionBanner.appendChild(span);
+  sessionBanner.appendChild(link);
+}
+
+// Decides what goes in the editor on page load: a shared link (highest
+// priority), then an autosaved session, then the default boilerplate.
+function initQueryTabsAndSession() {
+  const hash = location.hash;
+  if (hash.startsWith('#q=')) {
+    try {
+      const sql = b64DecodeUnicode(decodeURIComponent(hash.slice(3)));
+      queryTabs = [newTabObject('Shared query', sql)];
+      activeQueryTabId = queryTabs[0].id;
+      window.history.replaceState(null, '', location.pathname + location.search);
+      cm.setValue(sql);
+      renderQueryTabs();
+      showSessionBanner('Loaded a shared query link.');
+      return;
+    } catch (e) { /* fall through to normal init if the link was malformed */ }
+  }
+
+  try {
+    const raw = localStorage.getItem(LS_TABS);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && Array.isArray(saved.tabs) && saved.tabs.length) {
+        queryTabs = saved.tabs.map(t => newTabObject(t.name, t.sql));
+        activeQueryTabId = queryTabs[Math.min(saved.activeIndex || 0, queryTabs.length - 1)].id;
+        cm.setValue(queryTabs.find(t => t.id === activeQueryTabId).sql);
+        renderQueryTabs();
+        showSessionBanner('Restored your last session.');
+        return;
+      }
+    }
+  } catch (e) { /* ignore a corrupted autosave */ }
+
+  queryTabs = [newTabObject('Query 1', BOILERPLATE_SQL)];
+  activeQueryTabId = queryTabs[0].id;
+  cm.setValue(BOILERPLATE_SQL);
+  renderQueryTabs();
+}
+
+// ---------- Autosave (debounced) ----------
+let autosaveTimer = null;
+function autosaveSession() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    try {
+      captureActiveTabSql();
+      const payload = { tabs: queryTabs.map(t => ({ name: t.name, sql: t.sql })), activeIndex: queryTabs.findIndex(t => t.id === activeQueryTabId) };
+      localStorage.setItem(LS_TABS, JSON.stringify(payload));
+      if (db) {
+        const bytes = db.export();
+        if (bytes.length < 4 * 1024 * 1024) { // stay well under typical localStorage quotas
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          localStorage.setItem(LS_DB, btoa(binary));
+        }
+      }
+    } catch (e) { console.warn('Autosave failed', e); }
+  }, 300);
+}
+window.addEventListener('beforeunload', () => { captureActiveTabSql(); autosaveSession(); });
+
+// ---------- Dropdown panels ----------
+function closeAllDropdowns() {
+  snippetsPanel.classList.remove('open');
+  sampleDataPanel.classList.remove('open');
+}
+document.addEventListener('click', closeAllDropdowns);
+
+// ---------- Snippets ----------
+function loadSnippets() { try { return JSON.parse(localStorage.getItem(LS_SNIPPETS) || '[]'); } catch (e) { return []; } }
+function saveSnippets(list) { try { localStorage.setItem(LS_SNIPPETS, JSON.stringify(list)); } catch (e) { console.warn('Could not save snippets', e); } }
+
+function renderSnippetsPanel() {
+  const list = loadSnippets();
+  snippetsPanel.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'dropdown-head';
+  head.innerHTML = '<span>Saved snippets</span>';
+  snippetsPanel.appendChild(head);
+
+  const saveItem = document.createElement('div');
+  saveItem.className = 'dropdown-item';
+  saveItem.innerHTML = '<span class="di-title">+ Save current query as snippet</span>';
+  saveItem.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    const name = prompt('Name this snippet:');
+    if (!name || !name.trim()) return;
+    const l = loadSnippets();
+    l.unshift({ name: name.trim().slice(0, 60), sql: cm.getValue() });
+    saveSnippets(l.slice(0, 50));
+    renderSnippetsPanel();
+  });
+  snippetsPanel.appendChild(saveItem);
+
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'dropdown-empty';
+    empty.textContent = 'No snippets saved yet.';
+    snippetsPanel.appendChild(empty);
+    return;
+  }
+
+  list.forEach((snip, i) => {
+    const item = document.createElement('div');
+    item.className = 'dropdown-item';
+    item.style.cssText = 'flex-direction:row; align-items:center;';
+    const info = document.createElement('span');
+    info.style.cssText = 'flex:1; overflow:hidden; display:block;';
+    info.innerHTML = `<span class="di-title">${escapeHtml(snip.name)}</span><br><span class="di-sub">${escapeHtml(snip.sql.slice(0, 42).replace(/\n/g, ' '))}${snip.sql.length > 42 ? '…' : ''}</span>`;
+    const del = document.createElement('span');
+    del.className = 'di-del';
+    del.textContent = '✕';
+    del.title = 'Delete snippet';
+    del.style.cssText = 'opacity:0.5; padding:2px 6px; border-radius:4px; flex-shrink:0;';
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const l = loadSnippets();
+      l.splice(i, 1);
+      saveSnippets(l);
+      renderSnippetsPanel();
+    });
+    item.appendChild(info);
+    item.appendChild(del);
+    item.addEventListener('click', () => { closeAllDropdowns(); addQueryTab(snip.sql); });
+    snippetsPanel.appendChild(item);
+  });
+}
+
+document.getElementById('btnSnippets').addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  const willOpen = !snippetsPanel.classList.contains('open');
+  closeAllDropdowns();
+  if (willOpen) { renderSnippetsPanel(); snippetsPanel.classList.add('open'); }
+});
+snippetsPanel.addEventListener('click', (ev) => ev.stopPropagation());
+
+// ---------- Sample dataset gallery ----------
+const SAMPLE_DATASETS = {
+  ecommerce: {
+    label: 'E-commerce',
+    sub: 'customers, products, orders, order_items',
+    sql: `CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL, city TEXT, email TEXT);
+CREATE TABLE products (id INTEGER PRIMARY KEY, name TEXT NOT NULL, price REAL NOT NULL, category TEXT);
+CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER REFERENCES customers(id), order_date DATE, status TEXT);
+CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders(id), product_id INTEGER REFERENCES products(id), quantity INTEGER);
+
+INSERT INTO customers (name, city, email) VALUES
+  ('Ariana Cole', 'Austin', 'ariana@example.com'),
+  ('Devon Marsh', 'Denver', 'devon@example.com'),
+  ('Priya Nair', 'Seattle', 'priya@example.com');
+
+INSERT INTO products (name, price, category) VALUES
+  ('Wireless Mouse', 24.99, 'Electronics'),
+  ('Standing Desk', 349.00, 'Furniture'),
+  ('Notebook Set', 8.50, 'Office');
+
+INSERT INTO orders (customer_id, order_date, status) VALUES
+  (1, '2024-01-15', 'shipped'),
+  (2, '2024-02-03', 'processing'),
+  (1, '2024-03-10', 'delivered');
+
+INSERT INTO order_items (order_id, product_id, quantity) VALUES
+  (1, 1, 2), (1, 3, 1), (2, 2, 1), (3, 1, 1), (3, 2, 1);
+
+SELECT o.id AS order_id, c.name, p.name AS product, oi.quantity, p.price * oi.quantity AS line_total
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+JOIN order_items oi ON oi.order_id = o.id
+JOIN products p ON p.id = oi.product_id;`
+  },
+  hr: {
+    label: 'HR',
+    sub: 'departments, employees',
+    sql: `CREATE TABLE departments (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT NOT NULL, department_id INTEGER REFERENCES departments(id), salary INTEGER, hire_date DATE);
+
+INSERT INTO departments (name) VALUES ('Engineering'), ('Sales'), ('Support');
+
+INSERT INTO employees (name, department_id, salary, hire_date) VALUES
+  ('Nadia Farrow', 1, 105000, '2020-08-30'),
+  ('Devon Marsh', 1, 91000, '2022-06-21'),
+  ('Ariana Cole', 2, 52000, '2023-01-15'),
+  ('Liam Ortega', 3, 47000, '2021-11-09');
+
+SELECT d.name AS department, COUNT(*) AS headcount, AVG(e.salary) AS avg_salary
+FROM employees e JOIN departments d ON d.id = e.department_id
+GROUP BY d.name
+ORDER BY avg_salary DESC;`
+  },
+  library: {
+    label: 'Library',
+    sub: 'authors, books, loans',
+    sql: `CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT NOT NULL, author_id INTEGER REFERENCES authors(id), published_year INTEGER);
+CREATE TABLE loans (id INTEGER PRIMARY KEY, book_id INTEGER REFERENCES books(id), borrower TEXT, loaned_on DATE, returned_on DATE);
+
+INSERT INTO authors (name) VALUES ('Octavia Reyes'), ('Marcus Webb');
+
+INSERT INTO books (title, author_id, published_year) VALUES
+  ('The Glass Orchard', 1, 2018),
+  ('Currents', 1, 2021),
+  ('Field Notes', 2, 2016);
+
+INSERT INTO loans (book_id, borrower, loaned_on, returned_on) VALUES
+  (1, 'J. Kim', '2024-01-05', '2024-01-19'),
+  (2, 'R. Alvarez', '2024-02-10', NULL),
+  (3, 'J. Kim', '2024-03-01', '2024-03-15');
+
+SELECT b.title, a.name AS author, l.borrower, l.loaned_on, l.returned_on
+FROM loans l JOIN books b ON b.id = l.book_id JOIN authors a ON a.id = b.author_id
+ORDER BY l.loaned_on DESC;`
+  }
+};
+
+function renderSampleDataPanel() {
+  sampleDataPanel.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'dropdown-head';
+  head.innerHTML = '<span>Load into a new tab</span>';
+  sampleDataPanel.appendChild(head);
+  Object.values(SAMPLE_DATASETS).forEach(ds => {
+    const item = document.createElement('div');
+    item.className = 'dropdown-item';
+    item.innerHTML = `<span class="di-title">${escapeHtml(ds.label)}</span><span class="di-sub">${escapeHtml(ds.sub)}</span>`;
+    item.addEventListener('click', () => {
+      closeAllDropdowns();
+      if (!engineReady) { alert('The SQL engine is still loading — try again in a moment.'); return; }
+      addQueryTab(ds.sql);
+      runQuery();
+    });
+    sampleDataPanel.appendChild(item);
+  });
+}
+document.getElementById('btnSampleData').addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  const willOpen = !sampleDataPanel.classList.contains('open');
+  closeAllDropdowns();
+  if (willOpen) { renderSampleDataPanel(); sampleDataPanel.classList.add('open'); }
+});
+sampleDataPanel.addEventListener('click', (ev) => ev.stopPropagation());
+
+// ---------- Schema-only export ----------
+document.getElementById('btnExportSchema').addEventListener('click', () => {
+  if (!engineReady) { alert('The SQL engine is still loading — try again in a moment.'); return; }
+  const res = db.exec(`SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND type IN ('table','view','index') ORDER BY type DESC, name;`);
+  if (!res.length || !res[0].values.length) { alert('There is no schema to export yet — create a table first.'); return; }
+  const dump = res[0].values.map(r => r[0] + ';').join('\n\n');
+  downloadBlob(dump, 'schema.sql', 'text/plain');
+});
+
+// ---------- Theme toggle ----------
+function applyTheme(theme) {
+  document.body.classList.toggle('light-theme', theme === 'light');
+  cm.setOption('theme', theme === 'light' ? 'eclipse' : 'dracula');
+  try { localStorage.setItem(LS_THEME, theme); } catch (e) {}
+}
+document.getElementById('btnTheme').addEventListener('click', () => {
+  applyTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
+});
+(function initTheme() {
+  let theme = 'dark';
+  try { theme = localStorage.getItem(LS_THEME) || 'dark'; } catch (e) {}
+  applyTheme(theme);
+})();
+
+// ---------- Dialect hint toggle ----------
+// The engine is always SQLite — this only changes which extra note the
+// hover tooltips show, for people mentally translating from another dialect.
+dialectSelect.addEventListener('change', () => {
+  currentDialect = dialectSelect.value;
+  try { localStorage.setItem(LS_DIALECT, currentDialect); } catch (e) {}
+});
+(function initDialect() {
+  try { currentDialect = localStorage.getItem(LS_DIALECT) || 'mysql'; } catch (e) {}
+  dialectSelect.value = currentDialect;
+})();
+
+// ---------- Hover tooltips on keywords & functions ----------
+const SQL_DOCS = {
+  SELECT: { d: 'Choose which columns to return from a query.', ex: 'SELECT name, city FROM customers;' },
+  FROM: { d: 'Names the table (or subquery) a query reads from.', ex: 'SELECT * FROM customers;' },
+  WHERE: { d: 'Filters rows before they are returned or modified.', ex: "SELECT * FROM customers WHERE city = 'Austin';" },
+  INSERT: { d: 'Adds new rows to a table.', ex: "INSERT INTO customers (name, city) VALUES ('Sam', 'Reno');" },
+  UPDATE: { d: 'Modifies existing rows that match a WHERE clause.', ex: "UPDATE customers SET city = 'Boise' WHERE id = 1;" },
+  DELETE: { d: 'Removes rows that match a WHERE clause.', ex: 'DELETE FROM customers WHERE id = 1;' },
+  JOIN: { d: 'Combines rows from two tables based on a related column.', ex: 'SELECT * FROM orders JOIN customers ON orders.customer_id = customers.id;' },
+  GROUP: { d: 'GROUP BY collapses rows into one row per distinct value.', ex: 'SELECT city, COUNT(*) FROM customers GROUP BY city;' },
+  HAVING: { d: 'Filters groups after GROUP BY, the way WHERE filters rows.', ex: 'SELECT city, COUNT(*) c FROM customers GROUP BY city HAVING c > 1;' },
+  ORDER: { d: 'ORDER BY sorts the result set.', ex: 'SELECT * FROM customers ORDER BY name DESC;' },
+  LIMIT: { d: 'Caps how many rows are returned.', ex: 'SELECT * FROM customers LIMIT 10;', pg: 'PostgreSQL also supports FETCH FIRST n ROWS ONLY.' },
+  BETWEEN: { d: 'Shorthand for a range check, inclusive on both ends.', ex: 'SELECT * FROM employees WHERE salary BETWEEN 40000 AND 90000;' },
+  LIKE: { d: 'Pattern match with % (any characters) and _ (one character).', ex: "SELECT * FROM customers WHERE name LIKE 'A%';" },
+  DISTINCT: { d: 'Removes duplicate rows from the result.', ex: 'SELECT DISTINCT city FROM customers;' },
+  UNION: { d: 'Stacks the results of two SELECTs, removing duplicates (UNION ALL keeps them).', ex: 'SELECT city FROM customers UNION SELECT city FROM suppliers;' },
+  CASE: { d: 'Inline conditional logic inside a query.', ex: "SELECT name, CASE WHEN city IS NULL THEN 'Unknown' ELSE city END FROM customers;" },
+  CREATE: { d: 'Defines a new table, view, index, or (here) a named database.', ex: 'CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);' },
+  DROP: { d: 'Permanently removes a table, view, index, or database.', ex: 'DROP TABLE customers;' },
+  ALTER: { d: 'Changes an existing table\u2019s structure.', ex: 'ALTER TABLE customers ADD COLUMN email TEXT;' },
+  TRUNCATE: { d: 'Empties a table of all rows (rewritten here as DELETE FROM — SQLite has no native TRUNCATE).', ex: 'TRUNCATE TABLE customers;' },
+  DESC: { d: 'As a standalone statement: describes a table\u2019s columns. Inside ORDER BY: sorts descending.', ex: 'DESC customers;' },
+  DESCRIBE: { d: 'Shows a table\u2019s columns, types, and keys.', ex: 'DESCRIBE customers;' },
+  SHOW: { d: 'SHOW TABLES / SHOW DATABASES / SHOW COLUMNS FROM list schema info.', ex: 'SHOW TABLES;' },
+  USE: { d: 'Sets the active database name for this session.', ex: 'USE shop;' },
+  DATABASE: { d: 'CREATE DATABASE / DROP DATABASE name the single active in-browser database.', ex: 'CREATE DATABASE shop;' },
+  PRIMARY: { d: 'PRIMARY KEY uniquely identifies each row in a table.', ex: 'id INTEGER PRIMARY KEY' },
+  FOREIGN: { d: 'FOREIGN KEY links a column to another table\u2019s primary key.', ex: 'customer_id INTEGER REFERENCES customers(id)' },
+  UNIQUE: { d: 'Ensures every value in a column (or set of columns) is distinct.', ex: 'email TEXT UNIQUE' },
+  CHECK: { d: 'A constraint that every row must satisfy.', ex: 'salary INTEGER CHECK (salary >= 0)' },
+  DEFAULT: { d: 'A fallback value used when none is supplied on INSERT.', ex: "status TEXT DEFAULT 'pending'" },
+  POWER: { d: 'Raises a number to a power.', ex: 'SELECT POWER(2, 5); -- 32' },
+  MOD: { d: 'Remainder after division.', ex: 'SELECT MOD(17, 5); -- 2' },
+  ROUND: { d: 'Rounds a number to a given number of decimal places.', ex: 'SELECT ROUND(91234.5678, 2);' },
+  CEIL: { d: 'Rounds up to the nearest integer.', ex: 'SELECT CEIL(4.2); -- 5' },
+  CEILING: { d: 'Rounds up to the nearest integer.', ex: 'SELECT CEILING(4.2); -- 5' },
+  FLOOR: { d: 'Rounds down to the nearest integer.', ex: 'SELECT FLOOR(4.8); -- 4' },
+  UCASE: { d: 'Converts text to upper case (alias for UPPER).', ex: "SELECT UCASE('hi'); -- HI" },
+  UPPER: { d: 'Converts text to upper case.', ex: "SELECT UPPER('hi'); -- HI" },
+  CHAR: { d: 'Builds a string from one or more character codes.', ex: 'SELECT CHAR(65); -- A' },
+  LCASE: { d: 'Converts text to lower case (alias for LOWER).', ex: "SELECT LCASE('HI'); -- hi" },
+  LOWER: { d: 'Converts text to lower case.', ex: "SELECT LOWER('HI'); -- hi" },
+  MID: { d: 'Extracts a substring — MID(text, start, length).', ex: "SELECT MID('database', 1, 4); -- data" },
+  SUBSTRING: { d: 'Extracts a substring — SUBSTRING(text, start, length).', ex: "SELECT SUBSTRING('database', 1, 4); -- data" },
+  SUBSTR: { d: 'Extracts a substring — SUBSTR(text, start, length).', ex: "SELECT SUBSTR('database', 1, 4); -- data" },
+  LENGTH: { d: 'Number of characters in a string.', ex: "SELECT LENGTH('sql'); -- 3" },
+  LEFT: { d: 'The leftmost n characters of a string.', ex: "SELECT LEFT('database', 4); -- data" },
+  RIGHT: { d: 'The rightmost n characters of a string.', ex: "SELECT RIGHT('database', 4); -- base" },
+  INSTR: { d: 'The 1-based position of a substring, or 0 if not found.', ex: "SELECT INSTR('database', 'a'); -- 2" },
+  TRIM: { d: 'Removes leading and trailing whitespace.', ex: "SELECT TRIM('  hi  '); -- 'hi'" },
+  LTRIM: { d: 'Removes leading whitespace.', ex: "SELECT LTRIM('  hi'); -- 'hi'" },
+  RTRIM: { d: 'Removes trailing whitespace.', ex: "SELECT RTRIM('hi  '); -- 'hi'" },
+  CONCAT: { d: 'Joins strings together. Returns NULL if any argument is NULL.', ex: "SELECT CONCAT(name, ' - ', city) FROM customers;" },
+  REPLACE: { d: 'Replaces every occurrence of a substring with another.', ex: "SELECT REPLACE('2024-01-01', '-', '/');" },
+  COALESCE: { d: 'Returns the first non-NULL argument.', ex: "SELECT COALESCE(city, 'Unknown') FROM customers;" },
+  IFNULL: { d: 'Returns the second value if the first is NULL.', ex: "SELECT IFNULL(city, 'Unknown') FROM customers;" },
+  CAST: { d: 'Converts a value to a different type.', ex: "SELECT CAST('42' AS INTEGER);" },
+  NOW: { d: 'Current UTC date and time.', ex: 'SELECT NOW();' },
+  DATE: { d: 'Extracts (or formats as) just the date part.', ex: 'SELECT DATE(hire_date) FROM employees;' },
+  MONTH: { d: 'Month number (1-12) from a date.', ex: "SELECT MONTH('2024-03-02'); -- 3" },
+  MONTHNAME: { d: 'Full month name from a date.', ex: "SELECT MONTHNAME('2024-03-02'); -- March" },
+  YEAR: { d: 'Year from a date.', ex: "SELECT YEAR('2024-03-02'); -- 2024" },
+  DAY: { d: 'Day of month from a date.', ex: "SELECT DAY('2024-03-02'); -- 2" },
+  DAYNAME: { d: 'Full weekday name from a date.', ex: "SELECT DAYNAME('2024-03-02'); -- Saturday" },
+  COUNT: { d: 'Counts rows. COUNT(*) counts all rows, COUNT(col) skips NULLs.', ex: 'SELECT COUNT(*) FROM customers;' },
+  MAX: { d: 'The largest value in a group.', ex: 'SELECT MAX(salary) FROM employees;' },
+  MIN: { d: 'The smallest value in a group.', ex: 'SELECT MIN(salary) FROM employees;' },
+  AVG: { d: 'The average value in a group.', ex: 'SELECT AVG(salary) FROM employees;' },
+  SUM: { d: 'The total of values in a group.', ex: 'SELECT SUM(salary) FROM employees;' },
+  ABS: { d: 'Absolute value.', ex: 'SELECT ABS(-8); -- 8' },
+};
+const DIALECT_NOTES = { LIMIT: 'pg' };
+
+let tooltipTimer = null;
+cm.getWrapperElement().addEventListener('mousemove', (ev) => {
+  clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(() => {
+    const pos = cm.coordsChar({ left: ev.clientX, top: ev.clientY });
+    const token = cm.getTokenAt(pos);
+    const word = (token.string || '').replace(/[^A-Za-z_]/g, '').toUpperCase();
+    const doc = word ? SQL_DOCS[word] : null;
+    if (!doc) { sqlTooltip.style.display = 'none'; return; }
+    let html = `<div class="tt-name">${word}</div><div>${escapeHtml(doc.d)}</div><div class="tt-example">${escapeHtml(doc.ex)}</div>`;
+    if (doc.pg && currentDialect === 'postgres') html += `<div class="tt-dialect">${escapeHtml(doc.pg)}</div>`;
+    sqlTooltip.innerHTML = html;
+    sqlTooltip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 300) + 'px';
+    sqlTooltip.style.top = (ev.clientY + 16) + 'px';
+    sqlTooltip.style.display = 'block';
+  }, 150);
+});
+cm.getWrapperElement().addEventListener('mouseleave', () => { clearTimeout(tooltipTimer); sqlTooltip.style.display = 'none'; });
+
+// ---------- Generic modal ----------
+function openModal() { modalOverlay.classList.add('open'); }
+function closeModal() { modalOverlay.classList.remove('open'); }
+document.getElementById('modalClose').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (ev) => { if (ev.target === modalOverlay) closeModal(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && modalOverlay.classList.contains('open')) closeModal(); });
+
+// ---------- Guided SQL walkthrough ----------
+const TUTORIAL_STEPS = [
+  { title: 'Creating a table', explanation: 'CREATE TABLE defines the columns a table will hold and their types. PRIMARY KEY marks the column that uniquely identifies each row.', sql: 'CREATE TABLE students (id INTEGER PRIMARY KEY, name TEXT NOT NULL, grade INTEGER);' },
+  { title: 'Inserting rows', explanation: 'INSERT INTO adds new rows. List the columns you\u2019re filling in, then one VALUES tuple per row.', sql: "INSERT INTO students (name, grade) VALUES ('Sam', 9), ('Lee', 10), ('Noor', 9);" },
+  { title: 'Selecting & filtering', explanation: 'SELECT chooses columns, FROM names the table, WHERE filters rows.', sql: 'SELECT * FROM students WHERE grade = 9;' },
+  { title: 'Sorting & limiting', explanation: 'ORDER BY sorts the result; LIMIT caps how many rows come back.', sql: 'SELECT * FROM students ORDER BY grade DESC LIMIT 2;' },
+  { title: 'Aggregating', explanation: 'GROUP BY collapses rows sharing a value into one row per group, so you can use COUNT/AVG/SUM alongside it.', sql: 'SELECT grade, COUNT(*) AS students FROM students GROUP BY grade;' },
+  { title: 'Joining two tables', explanation: 'JOIN combines rows from two tables using a shared column — here, a second table of grade advisors.', sql: `CREATE TABLE advisors (grade INTEGER PRIMARY KEY, advisor TEXT);
+INSERT INTO advisors VALUES (9, 'Ms. Patel'), (10, 'Mr. Novak');
+SELECT s.name, s.grade, a.advisor FROM students s JOIN advisors a ON a.grade = s.grade;` }
+];
+let tutorialStep = 0;
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  modalTitle.textContent = `Learn SQL — ${step.title} (${tutorialStep + 1}/${TUTORIAL_STEPS.length})`;
+  modalBody.innerHTML = `<p>${escapeHtml(step.explanation)}</p><pre style="background:var(--surface-2); padding:10px; border-radius:6px; font-family:var(--mono); font-size:12px; overflow-x:auto; white-space:pre-wrap;">${escapeHtml(step.sql)}</pre>`;
+  modalFoot.innerHTML = '';
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'ghost';
+  prevBtn.textContent = '\u2190 Back';
+  prevBtn.disabled = tutorialStep === 0;
+  prevBtn.addEventListener('click', () => { tutorialStep--; renderTutorialStep(); });
+  const tryBtn = document.createElement('button');
+  tryBtn.className = 'primary';
+  tryBtn.textContent = 'Try it in editor';
+  tryBtn.addEventListener('click', () => { closeModal(); addQueryTab(step.sql); if (engineReady) runQuery(); });
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'ghost';
+  nextBtn.textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? 'Done' : 'Next \u2192';
+  nextBtn.addEventListener('click', () => { if (tutorialStep === TUTORIAL_STEPS.length - 1) { closeModal(); } else { tutorialStep++; renderTutorialStep(); } });
+  modalFoot.appendChild(prevBtn);
+  modalFoot.appendChild(tryBtn);
+  modalFoot.appendChild(nextBtn);
+}
+document.getElementById('btnLearn').addEventListener('click', () => { tutorialStep = 0; renderTutorialStep(); openModal(); });
+
+// ---------- ER diagram ----------
+function openErDiagram() {
+  modalTitle.textContent = 'ER Diagram';
+  modalFoot.innerHTML = '';
+  modalBody.innerHTML = '';
+  if (!engineReady) { modalBody.textContent = 'Engine still loading\u2026'; openModal(); return; }
+  const tablesRes = db.exec(`SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;`);
+  if (!tablesRes.length) {
+    modalBody.textContent = 'No tables yet — create some tables first, then reopen this diagram.';
+    openModal();
+    return;
+  }
+  const tableNames = tablesRes[0].values.map(r => r[0]);
+  const tableInfo = {};
+  const fkList = [];
+  tableNames.forEach(t => {
+    const cols = db.exec(`PRAGMA table_info(${quoteIdent(t)});`);
+    tableInfo[t] = cols.length ? cols[0].values.map(c => ({ name: c[1], pk: c[5] > 0 })) : [];
+    try {
+      const fks = db.exec(`PRAGMA foreign_key_list(${quoteIdent(t)});`);
+      if (fks.length) fks[0].values.forEach(f => fkList.push({ from: t, to: f[2] }));
+    } catch (e) { /* older sqlite build without foreign_key_list — diagram just skips the arrows */ }
+  });
+
+  const boxW = 180, rowH = 18, headH = 26, padTop = 40, gapX = 70, gapY = 60;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(tableNames.length)));
+  const colHeights = new Array(cols).fill(padTop);
+  const positions = {};
+  tableNames.forEach((t, i) => {
+    const col = i % cols;
+    const h = headH + tableInfo[t].length * rowH + 10;
+    positions[t] = { x: 30 + col * (boxW + gapX), y: colHeights[col], w: boxW, h };
+    colHeights[col] += h + gapY;
+  });
+  const svgW = 30 + cols * (boxW + gapX);
+  const svgH = Math.max(...colHeights) + 20;
+
+  let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto; font-family:var(--mono);">`;
+  svg += `<defs><marker id="erArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--teal)"/></marker></defs>`;
+  fkList.forEach(fk => {
+    const a = positions[fk.from], b = positions[fk.to];
+    if (!a || !b || fk.from === fk.to) return;
+    const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2;
+    const x2 = b.x + b.w / 2, y2 = b.y + b.h / 2;
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--teal)" stroke-width="1.5" opacity="0.6" marker-end="url(#erArrow)"/>`;
+  });
+  tableNames.forEach(t => {
+    const p = positions[t];
+    svg += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="6" fill="var(--surface-2)" stroke="var(--line-soft)"/>`;
+    svg += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${headH}" rx="6" fill="var(--accent-soft)"/>`;
+    svg += `<text x="${p.x + 10}" y="${p.y + 17}" font-size="12" font-weight="700" fill="var(--text)">${escapeHtml(t)}</text>`;
+    tableInfo[t].forEach((c, i) => {
+      svg += `<text x="${p.x + 10}" y="${p.y + headH + 13 + i * rowH}" font-size="10.5" fill="${c.pk ? 'var(--accent)' : 'var(--text-dim)'}">${c.pk ? '\u2022 ' : ''}${escapeHtml(c.name)}</text>`;
+    });
+  });
+  svg += '</svg>';
+  modalBody.innerHTML = svg;
+  openModal();
+}
+document.getElementById('btnErDiagram').addEventListener('click', openErDiagram);
+
+// ---------- Shareable query links ----------
+document.getElementById('btnShare').addEventListener('click', async () => {
+  const sql = cm.getValue();
+  const encoded = encodeURIComponent(b64EncodeUnicode(sql));
+  const url = `${location.origin}${location.pathname}#q=${encoded}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    statusText.textContent = 'Shareable link copied to clipboard';
+    statusText.className = 'status ok';
+  } catch (e) {
+    prompt('Copy this link:', url);
   }
 });
 </script>

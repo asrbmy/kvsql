@@ -62,6 +62,7 @@ Everything below runs directly in the editor. Commands are grouped by what's **n
 | `ALTER TABLE` | Native — add/rename columns, rename table. | `ALTER TABLE customers ADD COLUMN email TEXT;` |
 | `DROP TABLE` | Native. | `DROP TABLE customers;` |
 | `TRUNCATE [TABLE]` | Shimmed → rewritten to `DELETE FROM table`. | `TRUNCATE TABLE customers;` |
+| `RENAME TABLE` | Shimmed → rewritten to SQLite's `ALTER TABLE ... RENAME TO ...`. Supports comma-separated multi-renames. | `RENAME TABLE customers TO clients;` |
 | `CREATE VIEW` | Native. | `CREATE VIEW active_customers AS SELECT * FROM customers WHERE city IS NOT NULL;` |
 | `CREATE INDEX` | Native. | `CREATE INDEX idx_city ON customers(city);` |
 | `DESC` / `DESCRIBE` | Shimmed → rewritten into a `SELECT` over `pragma_table_info()`. Prints Field / Type / Null / Key / Default. | `DESCRIBE customers;` |
@@ -98,16 +99,20 @@ Everything below runs directly in the editor. Commands are grouped by what's **n
 | Function | Example |
 |---|---|
 | `POWER(x, y)` | `SELECT POWER(2, 5);` → `32` |
-| `MOD(x, y)` | `SELECT MOD(17, 5);` → `2` |
-| `ROUND(x, d)` | `SELECT ROUND(91234.5678, 2);` → `91234.57` |
+| `MOD(x, y)` | `SELECT MOD(11, 5);` → `1` |
+| `ROUND(x, d)` | `SELECT ROUND(15.789, 2);` → `15.79` |
 | `ABS(x)` | `SELECT ABS(-8);` → `8` |
 | `CEIL(x)` / `CEILING(x)` | `SELECT CEIL(4.2);` → `5` |
 | `FLOOR(x)` | `SELECT FLOOR(4.8);` → `4` |
+| `SIGN(x)` | `SELECT SIGN(-20);` → `-1` |
+| `SQRT(x)` | `SELECT SQRT(144);` → `12` |
+| `TRUNCATE(x, d)` | Shimmed. Truncates toward zero without rounding — different from the `TRUNCATE TABLE` statement above. `SELECT TRUNCATE(15.789, 2);` → `15.78` |
 
 ### String functions
 
 | Function | Example |
 |---|---|
+| `CHAR(code)` | Native — builds a string from character codes. `SELECT CHAR(65);` → `A` |
 | `UCASE(s)` / `UPPER(s)` | `SELECT UCASE('austin');` → `AUSTIN` |
 | `LCASE(s)` / `LOWER(s)` | `SELECT LCASE('AUSTIN');` → `austin` |
 | `MID(s, start, len)` / `SUBSTRING(s, start, len)` / `SUBSTR(s, start, len)` | `SELECT MID('database', 1, 4);` → `data` |
@@ -121,23 +126,45 @@ Everything below runs directly in the editor. Commands are grouped by what's **n
 | `COALESCE(a, b, ...)` / `IFNULL(a, b)` | `SELECT COALESCE(city, 'Unknown') FROM customers;` |
 | `CAST(x AS type)` | `SELECT CAST('42' AS INTEGER);` |
 
-### Date functions
+### Date & time functions
 
 | Function | Example |
 |---|---|
-| `NOW()` | `SELECT NOW();` → current UTC date/time |
-| `DATE(x)` | `SELECT DATE(hire_date) FROM employees;` |
-| `MONTH(x)` | `SELECT MONTH('2024-03-02');` → `3` |
-| `MONTHNAME(x)` | `SELECT MONTHNAME('2024-03-02');` → `March` |
-| `YEAR(x)` | `SELECT YEAR('2024-03-02');` → `2024` |
-| `DAY(x)` | `SELECT DAY('2024-03-02');` → `2` |
-| `DAYNAME(x)` | `SELECT DAYNAME('2024-03-02');` → `Saturday` |
+| `NOW()` | `SELECT NOW();` → current UTC date/time, e.g. `2026-08-01 09:14:02` |
+| `SYSDATE()` | Shimmed, same as `NOW()`. `SELECT SYSDATE();` |
+| `CURDATE()` | Shimmed. `SELECT CURDATE();` → current UTC date, e.g. `2026-08-01` |
+| `CURRENT_DATE()` | Shimmed — SQLite's `CURRENT_DATE` is a bare keyword, so `CURRENT_DATE()` is rewritten to drop the parentheses automatically. `SELECT CURRENT_DATE();` |
+| `DATE(x)` | Native. `SELECT DATE('2024-05-20 10:30:00');` → `2024-05-20` |
+| `MONTH(x)` | `SELECT MONTH('2024-05-20');` → `5` |
+| `MONTHNAME(x)` | `SELECT MONTHNAME('2024-05-20');` → `May` |
+| `YEAR(x)` | `SELECT YEAR('2024-05-20');` → `2024` |
+| `DAY(x)` / `DAYOFMONTH(x)` | `SELECT DAYOFMONTH('2024-05-20');` → `20` |
+| `DAYNAME(x)` | `SELECT DAYNAME('2024-05-20');` → `Monday` |
+| `DAYOFWEEK(x)` | Shimmed, MySQL numbering (1 = Sunday ... 7 = Saturday). `SELECT DAYOFWEEK('2024-05-20');` → `2` |
+| `DAYOFYEAR(x)` | Shimmed. `SELECT DAYOFYEAR('2024-05-20');` → `141` |
+
+### Joins & table aliases
+
+All native — no shim required.
+
+| Join type | Example |
+|---|---|
+| `CROSS JOIN` | `SELECT * FROM table1 CROSS JOIN table2;` |
+| Cartesian product (implicit) | `SELECT * FROM table1, table2;` |
+| Equi join (implicit, via `WHERE`) | `SELECT * FROM emp, dept WHERE emp.deptno = dept.deptno;` |
+| `INNER JOIN` / `JOIN` | `SELECT * FROM emp JOIN dept ON emp.deptno = dept.deptno;` |
+| `NATURAL JOIN` | `SELECT * FROM emp NATURAL JOIN dept;` |
+| `LEFT JOIN` | `SELECT * FROM emp LEFT JOIN project ON emp.emp_id = project.emp_id;` |
+| `RIGHT JOIN` | `SELECT * FROM emp RIGHT JOIN project ON emp.emp_id = project.emp_id;` |
+| `USING` | `SELECT * FROM emp JOIN dept USING (deptno);` |
+| Table alias | `SELECT e.name, d.dept_name FROM employees e JOIN departments d ON e.department_id = d.dept_id;` |
 
 ### Aggregate functions
 
 | Function | Example |
 |---|---|
 | `COUNT(*)` / `COUNT(col)` | `SELECT COUNT(*) FROM customers;` |
+| `COUNT(DISTINCT col)` | `SELECT COUNT(DISTINCT city) FROM customers;` |
 | `MAX(col)` | `SELECT MAX(salary) FROM employees;` |
 | `MIN(col)` | `SELECT MIN(salary) FROM employees;` |
 | `AVG(col)` | `SELECT AVG(salary) FROM employees;` |
@@ -191,6 +218,8 @@ Or just use the hosted version: **https://asrbmy.github.io/kvsql/**
 
 - One active database per session — `CREATE DATABASE` doesn't create a genuinely separate, isolated database.
 - Data is in-memory only unless you explicitly **Save DB**; refreshing the page clears it.
+- `SOURCE file.sql;` (MySQL client command to run a script off the server's filesystem) has no browser equivalent — use the **Open .sql** button instead. Typing `SOURCE ...` shows a reminder rather than erroring.
+- `FROM DUAL` is accepted and silently dropped (e.g. `SELECT 1 FROM DUAL;` just runs as `SELECT 1;`), since SQLite doesn't need a dummy table for expression-only queries.
 - Stored procedures, triggers-as-MySQL-syntax, and MySQL-specific storage engine options aren't supported (SQLite doesn't have an equivalent concept).
 
 ## Credits
