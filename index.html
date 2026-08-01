@@ -413,6 +413,19 @@
     border-bottom:1px solid var(--line-soft); padding:7px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0;
   }
     .CodeMirror .cm-error-line{ background:var(--error-soft) !important; }
+    .CodeMirror .cm-error-squiggle{
+      text-decoration-line: underline;
+      text-decoration-style: wavy;
+      text-decoration-color: #e5484d;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
+    }
+    .cm-error-gutter-dot{
+      width:8px; height:8px; border-radius:50%;
+      background:#e5484d; margin:6px auto 0;
+      box-shadow:0 0 0 2px rgba(229,72,77,0.25);
+    }
+    .CodeMirror-gutters { padding-right: 2px; }
 </style>
 </head>
 <body>
@@ -661,6 +674,7 @@ const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
   mode: 'text/x-sql',
   theme: 'dracula',
   lineNumbers: true,
+  gutters: ['CodeMirror-linenumbers', 'cm-error-gutter'],
   indentWithTabs: true,
   smartIndent: true,
   matchBrackets: true,
@@ -671,6 +685,7 @@ const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
     'Ctrl-Space': 'autocomplete'
   }
 });
+cm.on('change', () => clearErrorMarks());
 initQueryTabsAndSession();
 
 initDB();
@@ -1221,28 +1236,60 @@ function runQuery() {
 // ---------- Inline error highlighting ----------
 // SQLite error messages often include the offending fragment as
 // `near "TOKEN": syntax error`. We look that fragment up in the editor text
-// and highlight the line it appears on — an approximation (no real column
-// data comes back from sql.js), but usually points at the right spot.
+// to find its line/column (no byte-offset API comes back from sql.js) and
+// mark exactly that span with a squiggly underline, plus a gutter dot and a
+// soft full-line highlight so the failing spot is unmistakable even when the
+// token search can't pin down an exact match.
 let errorLineHandle = null;
+let errorMarkHandle = null;
 function clearErrorMarks() {
   if (errorLineHandle !== null) { cm.removeLineClass(errorLineHandle, 'background', 'cm-error-line'); errorLineHandle = null; }
+  if (errorMarkHandle !== null) { errorMarkHandle.clear(); errorMarkHandle = null; }
+  cm.clearGutter('cm-error-gutter');
+}
+function makeErrorGutterMarker(message) {
+  const el = document.createElement('div');
+  el.className = 'cm-error-gutter-dot';
+  el.title = message;
+  return el;
 }
 function highlightErrorLine(sql, message) {
+  const text = cm.getValue();
   const m = message.match(/near "([^"]+)"/i) || message.match(/near '([^']+)'/i);
   const needle = m ? m[1] : null;
-  const text = cm.getValue();
   let idx = -1;
   if (needle) idx = text.toLowerCase().indexOf(needle.toLowerCase());
+  let matchLen = needle ? needle.length : 0;
   if (idx === -1) {
     // Fall back: table/column "already exists" or "no such table/column" errors name the identifier directly.
     const m2 = message.match(/no such (?:table|column):\s*(\S+)/i) || message.match(/table\s+"?(\w+)"?\s+already exists/i);
-    if (m2) idx = text.toLowerCase().indexOf(m2[1].toLowerCase());
+    if (m2) { idx = text.toLowerCase().indexOf(m2[1].toLowerCase()); matchLen = m2[1].length; }
   }
-  if (idx === -1) return;
-  const before = text.slice(0, idx);
-  const line = before.split('\n').length - 1;
+
+  let line;
+  if (idx !== -1) {
+    const from = cm.posFromIndex(idx);
+    const to = cm.posFromIndex(idx + matchLen);
+    line = from.line;
+    errorMarkHandle = cm.markText(from, to, { className: 'cm-error-squiggle', title: message });
+  } else {
+    // No token to pin down — squiggle the first non-blank line of the failing
+    // statement so there's still a precise-looking marker, not just a banner.
+    const stmtStart = text.toLowerCase().indexOf(sql.trim().slice(0, 40).toLowerCase());
+    const from = cm.posFromIndex(stmtStart === -1 ? 0 : stmtStart);
+    line = from.line;
+    const lineText = cm.getLine(line);
+    const leading = lineText.match(/^\s*/)[0].length;
+    errorMarkHandle = cm.markText(
+      { line, ch: leading },
+      { line, ch: lineText.length },
+      { className: 'cm-error-squiggle', title: message }
+    );
+  }
+
   errorLineHandle = line;
   cm.addLineClass(line, 'background', 'cm-error-line');
+  cm.setGutterMarker(line, 'cm-error-gutter', makeErrorGutterMarker(message));
   cm.scrollIntoView({ line, ch: 0 }, 60);
 }
 
@@ -2349,7 +2396,7 @@ function openErDiagram() {
     tableInfo[t] = cols.length ? cols[0].values.map(c => ({ name: c[1], pk: c[5] > 0 })) : [];
     try {
       const fks = db.exec(`PRAGMA foreign_key_list(${quoteIdent(t)});`);
-      if (fks.length) fks[0].values.forEach(f => fkList.push({ from: t, to: f[2] }));
+      if (fks.length) fks[0].values.forEach(f => fkList.push({ from: t, to: f[2], fromCol: f[3], toCol: f[4] }));
     } catch (e) { /* older sqlite build without foreign_key_list — diagram just skips the arrows */ }
   });
 
@@ -2373,7 +2420,9 @@ function openErDiagram() {
     if (!a || !b || fk.from === fk.to) return;
     const x1 = a.x + a.w / 2, y1 = a.y + a.h / 2;
     const x2 = b.x + b.w / 2, y2 = b.y + b.h / 2;
-    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--teal)" stroke-width="1.5" opacity="0.6" marker-end="url(#erArrow)"/>`;
+    const label = `${fk.from}.${fk.fromCol} \u2192 ${fk.to}.${fk.toCol}`;
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--teal)" stroke-width="1.5" opacity="0.6" marker-end="url(#erArrow)"><title>${escapeHtml(label)}</title></line>`;
+    svg += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}" font-size="9" fill="var(--teal)" text-anchor="middle" opacity="0.85">${escapeHtml(fk.fromCol)} \u2192 ${escapeHtml(fk.toCol)}</text>`;
   });
   tableNames.forEach(t => {
     const p = positions[t];
