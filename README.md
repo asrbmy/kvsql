@@ -46,6 +46,13 @@ Destructive statements (`DROP`, `TRUNCATE`, or `DELETE`/`UPDATE` with no `WHERE`
 
 ---
 
+## Try it yourself
+
+Every command in the reference below is exercised in a ready-to-run test script:
+
+- **[`testsql.md`](testsql.md)** — the same script as plain Markdown, organized into 31 numbered sections you can read on GitHub or copy from manually.
+- **[`testsql.html`](testsql.html)** — an interactive version of the same script with a **Copy** button on every query block, so you can grab a single statement (or a whole section) and paste it straight into the editor without hand-selecting text.
+
 ## Supported SQL commands
 
 Everything below runs directly in the editor. Commands are grouped by what's **native to SQLite** (works out of the box) and what's a **MySQL-style shim** built specifically for this editor.

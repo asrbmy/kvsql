@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KVSQL — Test Script</title>
+<style>
+  :root{
+    --bg: #0F1416;
+    --surface: #161D20;
+    --surface-2: #1D262A;
+    --line-soft: #263237;
+    --text: #DCE4E6;
+    --text-dim: #7E9096;
+    --text-faint: #4E5D62;
+    --accent: #D9A441;
+    --accent-soft: rgba(217,164,65,0.12);
+    --teal: #4FA69A;
+    --teal-soft: rgba(79,166,154,0.12);
+    --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--sans);
+    line-height:1.6;
+  }
+  a{ color:var(--teal); }
+  header{
+    position:sticky; top:0; z-index:20; background:var(--surface);
+    border-bottom:1px solid var(--line-soft); padding:16px 24px;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  }
+  header h1{ font-size:16px; margin:0; font-family:var(--mono); }
+  header .sub{ color:var(--text-dim); font-size:12.5px; margin-top:2px; }
+  header .links{ display:flex; gap:14px; font-size:12.5px; font-family:var(--mono); }
+  .layout{ display:flex; max-width:1180px; margin:0 auto; }
+  nav.toc{
+    width:250px; flex-shrink:0; padding:24px 16px; position:sticky; top:73px;
+    align-self:flex-start; max-height:calc(100vh - 73px); overflow-y:auto;
+  }
+  nav.toc .toc-title{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin-bottom:10px; }
+  .toc-link{
+    display:block; padding:6px 10px; border-radius:6px; font-size:12.5px; color:var(--text-dim);
+    text-decoration:none; margin-bottom:2px;
+  }
+  .toc-link:hover{ background:var(--surface-2); color:var(--text); }
+  main{ flex:1; min-width:0; padding:24px 24px 80px; }
+  .sec{ margin-bottom:38px; scroll-margin-top:90px; }
+  .sec-head{ display:flex; align-items:baseline; gap:10px; border-bottom:1px solid var(--line-soft); padding-bottom:8px; margin-bottom:12px; }
+  .sec h2{ font-size:18px; margin:0; }
+  .sec h3{ font-size:14px; color:var(--teal); margin:18px 0 6px; }
+  .sec p{ color:var(--text-dim); font-size:13.5px; margin:8px 0; }
+  .sec code{ font-family:var(--mono); background:var(--surface-2); padding:1px 5px; border-radius:4px; font-size:12.5px; color:var(--accent); }
+  blockquote{
+    margin:10px 0; padding:8px 14px; border-left:3px solid var(--accent);
+    background:var(--accent-soft); color:var(--text-dim); font-size:13px; border-radius:0 6px 6px 0;
+  }
+  .code-block{
+    background:var(--surface); border:1px solid var(--line-soft); border-radius:8px;
+    overflow:hidden; margin:10px 0 16px;
+  }
+  .code-toolbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 10px; background:var(--surface-2); border-bottom:1px solid var(--line-soft);
+  }
+  .code-label{ font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-faint); }
+  .copy-btn{
+    display:flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--line-soft);
+    color:var(--text-dim); font-family:var(--sans); font-size:11.5px; padding:4px 9px; border-radius:6px;
+    cursor:pointer; transition:background .15s, color .15s, border-color .15s;
+  }
+  .copy-btn svg{ width:12px; height:12px; }
+  .copy-btn:hover{ background:var(--surface); color:var(--text); border-color:var(--teal); }
+  .copy-btn.copied{ background:var(--teal-soft); color:var(--teal); border-color:var(--teal); }
+  pre{ margin:0; padding:14px 16px; overflow-x:auto; }
+  pre code{
+    font-family:var(--mono); font-size:12.5px; color:var(--text); background:none; padding:0;
+    white-space:pre;
+  }
+  .top-hint{
+    background:var(--teal-soft); border:1px solid var(--line-soft); border-radius:8px;
+    padding:12px 16px; font-size:13px; color:var(--text-dim); margin-bottom:28px;
+  }
+  .menu-toggle{ display:none; }
+  @media (max-width: 860px){
+    nav.toc{ display:none; }
+    main{ padding:20px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>KVSQL — Test Script</h1>
+    <div class="sub">Every supported SQL command, ready to copy into the editor</div>
+  </div>
+  <div class="links">
+    <a href="https://asrbmy.github.io/kvsql/" target="_blank" rel="noopener">Open Editor →</a>
+    <a href="https://github.com/asrbmy/kvsql" target="_blank" rel="noopener">GitHub</a>
+    <a href="testsql.md">View as Markdown</a>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc">
+    <div class="toc-title">Sections</div>
+    <a href="#1-database-table-setup" class="toc-link">1. Database &amp; Table Setup</a>
+<a href="#2-insert-data" class="toc-link">2. INSERT Data</a>
+<a href="#3-select-from-where" class="toc-link">3. SELECT / FROM / WHERE</a>
+<a href="#4-comparison-operators" class="toc-link">4. Comparison Operators</a>
+<a href="#5-between-not-between" class="toc-link">5. BETWEEN / NOT BETWEEN</a>
+<a href="#6-logical-operators" class="toc-link">6. Logical Operators</a>
+<a href="#7-in-not-in" class="toc-link">7. IN / NOT IN</a>
+<a href="#8-like" class="toc-link">8. LIKE</a>
+<a href="#9-is-null-is-not-null" class="toc-link">9. IS NULL / IS NOT NULL</a>
+<a href="#10-distinct" class="toc-link">10. DISTINCT</a>
+<a href="#11-order-by-asc-desc" class="toc-link">11. ORDER BY / ASC / DESC</a>
+<a href="#12-limit" class="toc-link">12. LIMIT</a>
+<a href="#13-group-by-having" class="toc-link">13. GROUP BY / HAVING</a>
+<a href="#14-joins-table-aliases" class="toc-link">14. Joins &amp; Table Aliases</a>
+<a href="#15-union-union-all" class="toc-link">15. UNION / UNION ALL</a>
+<a href="#16-subqueries" class="toc-link">16. Subqueries</a>
+<a href="#17-case-when" class="toc-link">17. CASE WHEN</a>
+<a href="#18-with-common-table-expression" class="toc-link">18. WITH (Common Table Expression)</a>
+<a href="#19-mathematical-functions" class="toc-link">19. Mathematical Functions</a>
+<a href="#20-string-functions" class="toc-link">20. String Functions</a>
+<a href="#21-date-time-functions" class="toc-link">21. Date &amp; Time Functions</a>
+<a href="#22-aggregate-functions" class="toc-link">22. Aggregate Functions</a>
+<a href="#23-update-records" class="toc-link">23. UPDATE Records</a>
+<a href="#24-delete-records" class="toc-link">24. DELETE Records</a>
+<a href="#25-constraints" class="toc-link">25. Constraints</a>
+<a href="#26-views-indexes" class="toc-link">26. Views &amp; Indexes</a>
+<a href="#27-schema-introspection-admin-commands" class="toc-link">27. Schema Introspection &amp; Admin Commands</a>
+<a href="#28-rename-table" class="toc-link">28. RENAME TABLE</a>
+<a href="#29-truncate" class="toc-link">29. TRUNCATE</a>
+<a href="#30-dual" class="toc-link">30. DUAL</a>
+<a href="#31-cleanup" class="toc-link">31. Cleanup</a>
+
+  </nav>
+  <main>
+    <div class="top-hint">
+      Click <strong>Copy</strong> on any block below, then paste it straight into the
+      <a href="https://asrbmy.github.io/kvsql/" target="_blank" rel="noopener">KVSQL editor</a>
+      and hit Run. Blocks are independent — copy one at a time, or work through a whole section.
+    </div>
+<section class="sec" id="1-database-table-setup">
+  <div class="sec-head"><h2>1. Database &amp; Table Setup</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-1" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-1"><code>CREATE DATABASE test_db;
+USE test_db;
+
+CREATE TABLE departments (
+  dept_id   INTEGER PRIMARY KEY AUTO_INCREMENT,
+  dept_name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE employees (
+  id          INT PRIMARY KEY,
+  name        VARCHAR(50) NOT NULL,
+  department  VARCHAR(30),
+  city        VARCHAR(30),
+  salary      INT,
+  hire_date   DATE,
+  status      ENUM('active','on_leave','terminated') DEFAULT 'active',
+  dept_id     INT,
+  FOREIGN KEY (dept_id) REFERENCES departments(dept_id) ON DELETE CASCADE
+);
+
+CREATE TABLE projects (
+  project_id   INTEGER PRIMARY KEY AUTO_INCREMENT,
+  project_name VARCHAR(50) NOT NULL,
+  emp_id       INT,
+  budget       DECIMAL(10,2) CHECK (budget &gt;= 0)
+);
+
+ALTER TABLE employees ADD COLUMN bonus INT;</code></pre>
+  </div>
+</section>
+<section class="sec" id="2-insert-data">
+  <div class="sec-head"><h2>2. INSERT Data</h2></div>
+  <blockquote>One employee record intentionally contains a <code>NULL</code> city to demonstrate <code>IS NULL</code>.</blockquote>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-2" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-2"><code>INSERT INTO departments (dept_id, dept_name) VALUES
+  (1, 'Sales'),
+  (2, 'Engineering'),
+  (3, 'Support');
+
+INSERT INTO employees (id, name, department, city, salary, hire_date, dept_id) VALUES
+  (1, 'Ariana Cole',   'Sales',       'Austin',  52000, '2023-01-15', 1),
+  (2, 'Devon Marsh',   'Engineering', 'Denver',  91000, '2022-06-21', 2),
+  (3, 'Priya Nair',    'Sales',       NULL,      38000, '2024-03-02', 1),
+  (4, 'Liam Ortega',   'Support',     'Boise',   27000, '2021-11-09', 3),
+  (5, 'Nadia Farrow',  'Engineering', 'Denver', 105000, '2020-08-30', 2);
+
+INSERT INTO projects (project_name, emp_id, budget) VALUES
+  ('Website Revamp',   1, 15000.00),
+  ('API Migration',    2, 42000.50),
+  ('Support Overhaul', 4, 8000.00);</code></pre>
+  </div>
+</section>
+<section class="sec" id="3-select-from-where">
+  <div class="sec-head"><h2>3. SELECT / FROM / WHERE</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-3" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-3"><code>SELECT * FROM employees
+WHERE salary &gt; 50000;</code></pre>
+  </div>
+</section>
+<section class="sec" id="4-comparison-operators">
+  <div class="sec-head"><h2>4. Comparison Operators</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-4" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-4"><code>SELECT name, salary FROM employees WHERE salary = 91000;
+SELECT name, salary FROM employees WHERE salary &lt;&gt; 91000;
+SELECT name, salary FROM employees WHERE salary != 91000;
+SELECT name, salary FROM employees WHERE salary &lt; 40000;
+SELECT name, salary FROM employees WHERE salary &gt; 40000;
+SELECT name, salary FROM employees WHERE salary &lt;= 27000;
+SELECT name, salary FROM employees WHERE salary &gt;= 91000;</code></pre>
+  </div>
+</section>
+<section class="sec" id="5-between-not-between">
+  <div class="sec-head"><h2>5. BETWEEN / NOT BETWEEN</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-5" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-5"><code>SELECT name, salary
+FROM employees
+WHERE salary BETWEEN 30000 AND 90000;
+
+SELECT name, salary
+FROM employees
+WHERE salary NOT BETWEEN 30000 AND 90000;</code></pre>
+  </div>
+</section>
+<section class="sec" id="6-logical-operators">
+  <div class="sec-head"><h2>6. Logical Operators</h2></div>
+  <h3>AND</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-6" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-6"><code>SELECT name, department, salary
+FROM employees
+WHERE department = 'Sales'
+AND salary &gt; 40000;</code></pre>
+  </div>
+  <h3>OR</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-7" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-7"><code>SELECT name, department
+FROM employees
+WHERE department = 'Support'
+OR department = 'Sales';</code></pre>
+  </div>
+  <h3>NOT</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-8" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-8"><code>SELECT name
+FROM employees
+WHERE NOT department = 'Engineering';</code></pre>
+  </div>
+</section>
+<section class="sec" id="7-in-not-in">
+  <div class="sec-head"><h2>7. IN / NOT IN</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-9" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-9"><code>SELECT name, city
+FROM employees
+WHERE city IN ('Austin', 'Denver');
+
+SELECT name, city
+FROM employees
+WHERE city NOT IN ('Austin', 'Denver');</code></pre>
+  </div>
+</section>
+<section class="sec" id="8-like">
+  <div class="sec-head"><h2>8. LIKE</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-10" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-10"><code>SELECT name
+FROM employees
+WHERE name LIKE 'A%';
+
+SELECT name
+FROM employees
+WHERE name LIKE '%a';</code></pre>
+  </div>
+</section>
+<section class="sec" id="9-is-null-is-not-null">
+  <div class="sec-head"><h2>9. IS NULL / IS NOT NULL</h2></div>
+  <h3>IS NULL</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-11" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-11"><code>SELECT name
+FROM employees
+WHERE city IS NULL;</code></pre>
+  </div>
+  <h3>IS NOT NULL</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-12" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-12"><code>SELECT name
+FROM employees
+WHERE city IS NOT NULL;</code></pre>
+  </div>
+</section>
+<section class="sec" id="10-distinct">
+  <div class="sec-head"><h2>10. DISTINCT</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-13" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-13"><code>SELECT DISTINCT department
+FROM employees;</code></pre>
+  </div>
+</section>
+<section class="sec" id="11-order-by-asc-desc">
+  <div class="sec-head"><h2>11. ORDER BY / ASC / DESC</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-14" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-14"><code>SELECT name, salary FROM employees ORDER BY salary;
+SELECT name, salary FROM employees ORDER BY salary ASC;
+SELECT name, salary FROM employees ORDER BY salary DESC;
+SELECT name, department, salary FROM employees ORDER BY department ASC, salary DESC;</code></pre>
+  </div>
+</section>
+<section class="sec" id="12-limit">
+  <div class="sec-head"><h2>12. LIMIT</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-15" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-15"><code>SELECT name, salary
+FROM employees
+ORDER BY salary DESC
+LIMIT 2;
+
+SELECT name, salary
+FROM employees
+ORDER BY salary DESC
+LIMIT 2 OFFSET 1;</code></pre>
+  </div>
+</section>
+<section class="sec" id="13-group-by-having">
+  <div class="sec-head"><h2>13. GROUP BY / HAVING</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-16" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-16"><code>SELECT department, SUM(salary) AS total_salary
+FROM employees
+GROUP BY department;
+
+SELECT department, SUM(salary) AS total_salary
+FROM employees
+GROUP BY department
+HAVING SUM(salary) &gt; 60000;</code></pre>
+  </div>
+</section>
+<section class="sec" id="14-joins-table-aliases">
+  <div class="sec-head"><h2>14. Joins &amp; Table Aliases</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-17" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-17"><code>-- CROSS JOIN
+SELECT e.name, p.project_name
+FROM employees e CROSS JOIN projects p;
+
+-- Cartesian product (implicit)
+SELECT e.name, p.project_name
+FROM employees e, projects p;
+
+-- EQUI JOIN (implicit, via WHERE)
+SELECT e.name, d.dept_name
+FROM employees e, departments d
+WHERE e.dept_id = d.dept_id;
+
+-- INNER JOIN
+SELECT e.name, d.dept_name
+FROM employees e
+JOIN departments d ON e.dept_id = d.dept_id;
+
+-- NATURAL JOIN (matches on same-named columns, here dept_id)
+SELECT name, dept_name
+FROM employees NATURAL JOIN departments;
+
+-- LEFT JOIN
+SELECT e.name, p.project_name
+FROM employees e
+LEFT JOIN projects p ON e.id = p.emp_id;
+
+-- RIGHT JOIN
+SELECT e.name, p.project_name
+FROM employees e
+RIGHT JOIN projects p ON e.id = p.emp_id;
+
+-- USING
+SELECT e.name, d.dept_name
+FROM employees e JOIN departments d USING (dept_id);</code></pre>
+  </div>
+</section>
+<section class="sec" id="15-union-union-all">
+  <div class="sec-head"><h2>15. UNION / UNION ALL</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-18" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-18"><code>SELECT city FROM employees
+UNION
+SELECT dept_name FROM departments;
+
+SELECT department FROM employees
+UNION ALL
+SELECT dept_name FROM departments;</code></pre>
+  </div>
+</section>
+<section class="sec" id="16-subqueries">
+  <div class="sec-head"><h2>16. Subqueries</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-19" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-19"><code>SELECT name
+FROM employees
+WHERE id IN (SELECT emp_id FROM projects WHERE budget &gt; 10000);</code></pre>
+  </div>
+</section>
+<section class="sec" id="17-case-when">
+  <div class="sec-head"><h2>17. CASE WHEN</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-20" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-20"><code>SELECT
+  name,
+  salary,
+  CASE
+    WHEN salary &gt;= 90000 THEN 'Senior'
+    WHEN salary &gt;= 40000 THEN 'Mid'
+    ELSE 'Junior'
+  END AS band
+FROM employees;</code></pre>
+  </div>
+</section>
+<section class="sec" id="18-with-common-table-expression">
+  <div class="sec-head"><h2>18. WITH (Common Table Expression)</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-21" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-21"><code>WITH high_earners AS (
+  SELECT * FROM employees WHERE salary &gt; 50000
+)
+SELECT name, department FROM high_earners;</code></pre>
+  </div>
+</section>
+<section class="sec" id="19-mathematical-functions">
+  <div class="sec-head"><h2>19. Mathematical Functions</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-22" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-22"><code>SELECT
+  POWER(2, 5)          AS power_result,
+  MOD(17, 5)            AS mod_result,
+  ROUND(91234.5678, 2)  AS rounded,
+  ABS(-42)              AS absolute,
+  CEIL(4.2)             AS ceiling,
+  FLOOR(4.8)            AS floored,
+  SIGN(-20)             AS sign_result,
+  SQRT(144)             AS square_root,
+  TRUNCATE(15.789, 2)   AS truncated;</code></pre>
+  </div>
+</section>
+<section class="sec" id="20-string-functions">
+  <div class="sec-head"><h2>20. String Functions</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-23" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-23"><code>SELECT
+  CHAR(65)            AS char_result,
+  CONCAT(name, ' — ', department) AS full_label,
+  UCASE(name)          AS upper_name,
+  LCASE(department)    AS lower_dept,
+  MID(name, 1, 3)      AS mid_test,
+  SUBSTRING(name, 3)   AS substring_test,
+  SUBSTR(name, 1, 4)   AS substr_test,
+  LENGTH(name)         AS name_length,
+  LEFT(name, 4)        AS left_chars,
+  RIGHT(name, 4)       AS right_chars,
+  INSTR(name, 'a')     AS position_of_a,
+  TRIM('  padded  ')   AS trimmed,
+  LTRIM('  left')      AS left_trimmed,
+  RTRIM('right  ')     AS right_trimmed
+FROM employees;</code></pre>
+  </div>
+</section>
+<section class="sec" id="21-date-time-functions">
+  <div class="sec-head"><h2>21. Date &amp; Time Functions</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-24" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-24"><code>SELECT
+  NOW()                       AS current_datetime,
+  SYSDATE()                   AS sys_datetime,
+  CURDATE()                   AS current_date_string,
+  CURRENT_DATE()               AS current_date_literal,
+  DATE(hire_date)              AS date_only,
+  MONTH(hire_date)             AS hire_month,
+  MONTHNAME(hire_date)         AS hire_month_name,
+  YEAR(hire_date)              AS hire_year,
+  DAY(hire_date)                AS hire_day,
+  DAYOFMONTH(hire_date)        AS hire_day_of_month,
+  DAYNAME(hire_date)           AS hire_day_name,
+  DAYOFWEEK(hire_date)         AS hire_day_of_week,
+  DAYOFYEAR(hire_date)         AS hire_day_of_year
+FROM employees;</code></pre>
+  </div>
+</section>
+<section class="sec" id="22-aggregate-functions">
+  <div class="sec-head"><h2>22. Aggregate Functions</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-25" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-25"><code>SELECT
+  COUNT(*)                 AS total_employees,
+  COUNT(city)               AS employees_with_city,
+  COUNT(DISTINCT department) AS distinct_departments,
+  MAX(salary)                AS highest_salary,
+  MIN(salary)                AS lowest_salary,
+  AVG(salary)                AS average_salary,
+  SUM(salary)                AS total_payroll,
+  GROUP_CONCAT(name)         AS all_names
+FROM employees;</code></pre>
+  </div>
+</section>
+<section class="sec" id="23-update-records">
+  <div class="sec-head"><h2>23. UPDATE Records</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-26" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-26"><code>UPDATE employees
+SET bonus = 500
+WHERE department = 'Sales';</code></pre>
+  </div>
+</section>
+<section class="sec" id="24-delete-records">
+  <div class="sec-head"><h2>24. DELETE Records</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-27" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-27"><code>DELETE FROM employees
+WHERE salary &lt; 28000;</code></pre>
+  </div>
+</section>
+<section class="sec" id="25-constraints">
+  <div class="sec-head"><h2>25. Constraints</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-28" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-28"><code>-- Already declared above, exercised here:
+-- PRIMARY KEY  -&gt; employees.id, departments.dept_id, projects.project_id
+-- FOREIGN KEY  -&gt; employees.dept_id references departments.dept_id
+-- UNIQUE       -&gt; departments.dept_name
+-- NOT NULL     -&gt; employees.name, departments.dept_name
+-- DEFAULT      -&gt; employees.status defaults to 'active'
+-- CHECK        -&gt; projects.budget must be &gt;= 0
+-- CASCADE      -&gt; ON DELETE CASCADE on employees.dept_id</code></pre>
+  </div>
+  <p>Run this on its own — it's meant to fail, demonstrating the <code>CHECK</code> constraint:</p>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-29" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-29"><code>INSERT INTO projects (project_name, emp_id, budget) VALUES ('Bad Budget', 1, -100);</code></pre>
+  </div>
+  <p>Run this separately to see <code>ON DELETE CASCADE</code> in action (deleting a department removes its employees too):</p>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-30" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-30"><code>SELECT * FROM employees WHERE dept_id = 3;   -- before: Liam Ortega is here
+DELETE FROM departments WHERE dept_id = 3;
+SELECT * FROM employees WHERE dept_id = 3;   -- after: gone, cascaded automatically</code></pre>
+  </div>
+</section>
+<section class="sec" id="26-views-indexes">
+  <div class="sec-head"><h2>26. Views &amp; Indexes</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-31" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-31"><code>CREATE VIEW high_earners AS
+SELECT name, department, salary
+FROM employees
+WHERE salary &gt; 50000;
+
+SELECT * FROM high_earners;
+
+CREATE INDEX idx_employees_city ON employees(city);</code></pre>
+  </div>
+</section>
+<section class="sec" id="27-schema-introspection-admin-commands">
+  <div class="sec-head"><h2>27. Schema Introspection &amp; Admin Commands</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-32" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-32"><code>SHOW DATABASES;
+SHOW TABLES;
+SHOW COLUMNS FROM employees;
+
+DESC employees;
+DESCRIBE departments;</code></pre>
+  </div>
+</section>
+<section class="sec" id="28-rename-table">
+  <div class="sec-head"><h2>28. RENAME TABLE</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-33" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-33"><code>RENAME TABLE projects TO assignments;
+SHOW TABLES;
+RENAME TABLE assignments TO projects;</code></pre>
+  </div>
+</section>
+<section class="sec" id="29-truncate">
+  <div class="sec-head"><h2>29. TRUNCATE</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-34" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-34"><code>-- Function form: numeric truncation
+SELECT TRUNCATE(99.999, 1);
+
+-- Statement form: empties a table (rewritten to DELETE FROM under the hood)
+TRUNCATE TABLE projects;</code></pre>
+  </div>
+</section>
+<section class="sec" id="30-dual">
+  <div class="sec-head"><h2>30. DUAL</h2></div>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-35" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-35"><code>SELECT 1 + 1 FROM DUAL;
+SELECT NOW() FROM DUAL;</code></pre>
+  </div>
+</section>
+<section class="sec" id="31-cleanup">
+  <div class="sec-head"><h2>31. Cleanup</h2></div>
+  <h3>Drop Table (with IF EXISTS)</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-36" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-36"><code>DROP TABLE IF EXISTS high_earners; -- this is actually a VIEW; SQLite lets DROP TABLE IF EXISTS no-op safely
+DROP VIEW IF EXISTS high_earners;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS employees;
+DROP TABLE IF EXISTS departments;</code></pre>
+  </div>
+  <h3>Drop Database</h3>
+  <div class="code-block">
+    <div class="code-toolbar">
+      <span class="code-label">SQL</span>
+      <button class="copy-btn" data-target="code-37" onclick="copyBlock(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="1"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        <span>Copy</span>
+      </button>
+    </div>
+    <pre id="code-37"><code>DROP DATABASE test_db;</code></pre>
+  </div>
+</section>
+
+  </main>
+</div>
+
+<script>
+function copyBlock(btn) {
+  const id = btn.getAttribute('data-target');
+  const codeEl = document.getElementById(id);
+  const text = codeEl.textContent;
+  const done = () => {
+    const label = btn.querySelector('span');
+    const original = label.textContent;
+    btn.classList.add('copied');
+    label.textContent = 'Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); label.textContent = original; }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
+  document.body.removeChild(ta);
+}
+</script>
+</body>
+</html>
