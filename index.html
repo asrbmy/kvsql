@@ -517,6 +517,8 @@ let activeTabIndex = 0;     // which result set tab is showing
 let sortState = { col: -1, dir: 1 };
 let filterText = '';
 const ROW_CAP = 500;        // cap DOM rows so a huge SELECT can't freeze the tab
+let errorLineHandle = null; // line highlighted by the last query error, if any
+let errorMarkHandle = null; // CodeMirror markText handle for the squiggle underline
 
 // ---------- Persisted session state ----------
 const LS_SQL = 'kvsql_sql_v1';
@@ -1077,8 +1079,6 @@ function runQuery() {
 // mark exactly that span with a squiggly underline, plus a gutter dot and a
 // soft full-line highlight so the failing spot is unmistakable even when the
 // token search can't pin down an exact match.
-let errorLineHandle = null;
-let errorMarkHandle = null;
 function clearErrorMarks() {
   if (errorLineHandle !== null) { cm.removeLineClass(errorLineHandle, 'background', 'cm-error-line'); errorLineHandle = null; }
   if (errorMarkHandle !== null) { errorMarkHandle.clear(); errorMarkHandle = null; }
