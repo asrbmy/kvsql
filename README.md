@@ -3,6 +3,7 @@
 A browser-based SQL editor and playground. Write, run, and share SQL — no server, no signup, no install. Everything runs locally in your browser tab.
 
 - **Live demo:** https://asrbmy.github.io/kvsql/
+- **Test script (copyable):** https://asrbmy.github.io/kvsql/testsql.html
 - **Source code:** https://github.com/asrbmy/kvsql
 - **Developed by:** ASRBMY
 
@@ -51,7 +52,7 @@ Destructive statements (`DROP`, `TRUNCATE`, or `DELETE`/`UPDATE` with no `WHERE`
 Every command in the reference below is exercised in a ready-to-run test script:
 
 - **[`testsql.md`](testsql.md)** — the same script as plain Markdown, organized into 31 numbered sections you can read on GitHub or copy from manually.
-- **[`testsql.html`](testsql.html)** — an interactive version of the same script with a **Copy** button on every query block, so you can grab a single statement (or a whole section) and paste it straight into the editor without hand-selecting text.
+- **[`testsql.html`](testsql.html)** — an interactive version of the same script with a **Copy** button on every query block, so you can grab a single statement (or a whole section) and paste it straight into the editor without hand-selecting text. Live: **https://asrbmy.github.io/kvsql/testsql.html**
 
 ## Supported SQL commands
 
