@@ -892,7 +892,7 @@ function registerCustomFunctions(database) {
 // since this in-browser engine only ever has one active database rather
 // than a whole server full of them.
 function dropAllTables() {
-  const tables = db.exec(`SELECT name FROM sqlite_master WHERE type='table';`);
+  const tables = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';`);
   if (tables.length) tables[0].values.forEach(r => db.run(`DROP TABLE IF EXISTS ${quoteIdent(r[0])};`));
 }
 
@@ -904,6 +904,21 @@ let activeDatabaseName = null;
 //  - DESC / DESCRIBE table — turned into a SELECT over pragma_table_info()
 //    so it renders in the results grid the way MySQL's DESCRIBE does.
 // Returns { sql, notices }: `sql` is what actually gets sent to db.exec().
+// Strips leading whitespace and leading `-- ...` / `/* ... */` comments from
+// a statement so the pattern checks below can recognize a shimmed command
+// (TRUNCATE, DESC, SHOW, etc.) even when it's preceded by a comment line —
+// a very common thing to write and previously not accounted for.
+function stripLeadingComments(s) {
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/^\s+/, '');
+    s = s.replace(/^--[^\n]*\n?/, '');
+    s = s.replace(/^\/\*[\s\S]*?\*\//, '');
+  } while (s !== prev);
+  return s;
+}
+
 function preprocessSql(rawSql) {
   const statements = splitStatements(rawSql);
   const kept = [];
@@ -911,55 +926,56 @@ function preprocessSql(rawSql) {
 
   statements.forEach(stmt => {
     let s = stmt;
+    const head = stripLeadingComments(s); // used only for matching leading keywords
 
-    let m = s.match(/^\s*CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    let m = head.match(/^CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       activeDatabaseName = m[1];
       notices.push(`Database "${m[1]}" ready — this editor works with one active database, so CREATE DATABASE just names it.`);
       return;
     }
-    m = s.match(/^\s*DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    m = head.match(/^DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       dropAllTables();
       if (activeDatabaseName === m[1]) activeDatabaseName = null;
       notices.push(`Database "${m[1]}" dropped — every table in this workspace was removed.`);
       return;
     }
-    m = s.match(/^\s*USE\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    m = head.match(/^USE\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       activeDatabaseName = m[1];
       notices.push(`Now using database "${m[1]}".`);
       return;
     }
-    m = s.match(/^\s*(?:DESC|DESCRIBE)\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    m = head.match(/^(?:DESC|DESCRIBE)\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       const t = m[1].replace(/'/g, "''");
       s = `SELECT name AS "Field", type AS "Type", CASE WHEN "notnull" = 0 THEN 'YES' ELSE 'NO' END AS "Null", CASE WHEN pk > 0 THEN 'PRI' ELSE '' END AS "Key", dflt_value AS "Default" FROM pragma_table_info('${t}')`;
       kept.push(s);
       return;
     }
-    m = s.match(/^\s*SHOW\s+COLUMNS\s+FROM\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    m = head.match(/^SHOW\s+COLUMNS\s+FROM\s+[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       const t = m[1].replace(/'/g, "''");
       s = `SELECT name AS "Field", type AS "Type", CASE WHEN "notnull" = 0 THEN 'YES' ELSE 'NO' END AS "Null", CASE WHEN pk > 0 THEN 'PRI' ELSE '' END AS "Key", dflt_value AS "Default" FROM pragma_table_info('${t}')`;
       kept.push(s);
       return;
     }
-    if (/^\s*SHOW\s+TABLES\s*$/i.test(s)) {
-      kept.push(`SELECT name AS "Tables" FROM sqlite_master WHERE type='table' ORDER BY name`);
+    if (/^SHOW\s+TABLES\s*$/i.test(head)) {
+      kept.push(`SELECT name AS "Tables" FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`);
       return;
     }
-    if (/^\s*SHOW\s+DATABASES\s*$/i.test(s)) {
+    if (/^SHOW\s+DATABASES\s*$/i.test(head)) {
       kept.push(`SELECT ${sqlStringLiteral(activeDatabaseName || 'main')} AS "Database"`);
       return;
     }
-    m = s.match(/^\s*TRUNCATE\s+(?:TABLE\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
+    m = head.match(/^TRUNCATE\s+(?:TABLE\s+)?[`"']?([A-Za-z_][A-Za-z0-9_]*)[`"']?\s*$/i);
     if (m) {
       kept.push(`DELETE FROM ${quoteIdent(m[1])}`);
       return;
     }
     // MySQL's RENAME TABLE a TO b [, c TO d, ...] -> SQLite's ALTER TABLE ... RENAME TO ...
-    m = s.match(/^\s*RENAME\s+TABLE\s+(.+)$/i);
+    m = head.match(/^RENAME\s+TABLE\s+(.+)$/i);
     if (m) {
       const pairs = m[1].split(',').map(p => p.trim()).filter(Boolean);
       const alters = [];
@@ -971,7 +987,7 @@ function preprocessSql(rawSql) {
     }
     // MySQL client-only SOURCE command reads a file from the server's
     // filesystem — there's no equivalent in a browser sandbox.
-    if (/^\s*SOURCE\s+\S/i.test(s)) {
+    if (/^SOURCE\s+\S/i.test(head)) {
       notices.push(`SOURCE isn't available here (a browser SQL editor has no filesystem access) — use the "Open .sql" button in the toolbar to load a script file instead.`);
       return;
     }
@@ -979,7 +995,7 @@ function preprocessSql(rawSql) {
     s = s.replace(/\bFROM\s+DUAL\b/gi, '');
     // MySQL's AUTO_INCREMENT -> SQLite's AUTOINCREMENT (only follows
     // INTEGER PRIMARY KEY in SQLite's syntax, unlike MySQL's freer column order).
-    if (/^\s*CREATE\s+TABLE\b/i.test(s)) {
+    if (/^CREATE\s+TABLE\b/i.test(head)) {
       s = s.replace(/\bAUTO_INCREMENT\b/gi, 'AUTOINCREMENT');
       // MySQL's ENUM('a','b',...) -> TEXT with a CHECK constraint restricting
       // the allowed values, since SQLite's column-type grammar doesn't accept

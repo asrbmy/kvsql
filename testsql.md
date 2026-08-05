@@ -347,8 +347,10 @@ SELECT
 SELECT
   CHAR(65)            AS char_result,
   CONCAT(name, ' — ', department) AS full_label,
-  UCASE(name)          AS upper_name,
-  LCASE(department)    AS lower_dept,
+  UCASE(name)          AS ucase_name,
+  UPPER(name)          AS upper_name,
+  LCASE(department)    AS lcase_dept,
+  LOWER(department)    AS lower_dept,
   MID(name, 1, 3)      AS mid_test,
   SUBSTRING(name, 3)   AS substring_test,
   SUBSTR(name, 1, 4)   AS substr_test,
@@ -515,8 +517,7 @@ SELECT NOW() FROM DUAL;
 ### Drop Table (with IF EXISTS)
 
 ```sql
-DROP TABLE IF EXISTS high_earners; -- this is actually a VIEW; SQLite lets DROP TABLE IF EXISTS no-op safely
-DROP VIEW IF EXISTS high_earners;
+DROP VIEW IF EXISTS high_earners;   -- this was a VIEW, not a TABLE — DROP TABLE would fail even with IF EXISTS
 DROP TABLE IF EXISTS projects;
 DROP TABLE IF EXISTS employees;
 DROP TABLE IF EXISTS departments;
