@@ -330,11 +330,7 @@
     border-top:1px solid var(--line-soft); flex-shrink:0;
   }
 
-  /* ---------- Session restore banner ---------- */
-  .session-banner{
-    font-family:var(--sans); font-size:11.5px; color:var(--text-dim); background:var(--teal-soft);
-    border-bottom:1px solid var(--line-soft); padding:7px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0;
-  }
+  /* ---------- Inline error highlighting ---------- */
     .CodeMirror .cm-error-line{ background:var(--error-soft) !important; }
     .CodeMirror .cm-error-squiggle{
       text-decoration-line: underline;
@@ -403,7 +399,6 @@
   </aside>
 
   <div class="main">
-    <div class="session-banner" id="sessionBanner" style="display:none;"></div>
     <div class="toolbar">
       <div class="toolbar-scroll">
       <button class="ghost" id="btnFormat" title="Tidy up whitespace">
@@ -537,7 +532,6 @@ const btnRun = document.getElementById('btnRun');
 const sidebar = document.getElementById('sidebar');
 const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 const editorWrap = document.getElementById('editorWrap');
-const sessionBanner = document.getElementById('sessionBanner');
 const modalOverlay = document.getElementById('modalOverlay');
 const modalTitle = document.getElementById('modalTitle');
 const modalBody = document.getElementById('modalBody');
@@ -561,22 +555,18 @@ const cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
 cm.on('change', () => clearErrorMarks());
 initSession();
 
-initDB();
-
 async function initDB() {
   try {
     SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}` });
     let restored = false;
-    if (!location.hash.startsWith('#q=')) {
-      try {
-        const savedDb = localStorage.getItem(LS_DB);
-        if (savedDb) {
-          const bytes = Uint8Array.from(atob(savedDb), c => c.charCodeAt(0));
-          db = new SQL.Database(bytes);
-          restored = true;
-        }
-      } catch (e) { /* ignore a corrupted autosave and fall back to a blank database */ }
-    }
+    try {
+      const savedDb = localStorage.getItem(LS_DB);
+      if (savedDb) {
+        const bytes = Uint8Array.from(atob(savedDb), c => c.charCodeAt(0));
+        db = new SQL.Database(bytes);
+        restored = true;
+      }
+    } catch (e) { /* ignore a corrupted autosave and fall back to a blank database */ }
     if (!restored) db = new SQL.Database();
     registerCustomFunctions(db);
     engineReady = true;
@@ -735,8 +725,32 @@ function escapeHtml(str) {
 // Split on statement-terminating semicolons well enough to sanity-check each
 // piece for destructive intent. Not a full SQL parser — just a safety net,
 // not a security boundary (the database is local to this browser tab).
+// Splits a SQL script into individual statements on top-level semicolons —
+// tracking single/double-quoted strings, backtick identifiers, and both
+// comment styles so a semicolon inside a string value (e.g. an INSERT with
+// "3; bring the report" as a value) doesn't get mistaken for a statement
+// boundary and torn in half.
 function splitStatements(sql) {
-  return sql.split(';').map(s => s.trim()).filter(Boolean);
+  const statements = [];
+  let cur = '';
+  let inSingle = false, inDouble = false, inBacktick = false, inLineComment = false, inBlockComment = false;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i], next = sql[i + 1];
+    if (inLineComment) { cur += c; if (c === '\n') inLineComment = false; continue; }
+    if (inBlockComment) { cur += c; if (c === '*' && next === '/') { cur += next; i++; inBlockComment = false; } continue; }
+    if (inSingle) { cur += c; if (c === "'" && next === "'") { cur += next; i++; } else if (c === "'") inSingle = false; continue; }
+    if (inDouble) { cur += c; if (c === '"' && next === '"') { cur += next; i++; } else if (c === '"') inDouble = false; continue; }
+    if (inBacktick) { cur += c; if (c === '`') inBacktick = false; continue; }
+    if (c === "'") { inSingle = true; cur += c; continue; }
+    if (c === '"') { inDouble = true; cur += c; continue; }
+    if (c === '`') { inBacktick = true; cur += c; continue; }
+    if (c === '-' && next === '-') { inLineComment = true; cur += c; continue; }
+    if (c === '/' && next === '*') { inBlockComment = true; cur += c; continue; }
+    if (c === ';') { statements.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  if (cur.trim()) statements.push(cur);
+  return statements.map(s => s.trim()).filter(Boolean);
 }
 
 function isDestructive(stmt) {
@@ -1017,6 +1031,7 @@ function runQuery() {
   const sql = cm.getValue().trim();
   if (!sql) return;
   clearErrorMarks();
+  registerCustomFunctions(db); // idempotent safety net — guarantees CURDATE(), CEIL(), etc. are always available
 
   const statements = splitStatements(sql);
   const destructive = statements.filter(isDestructive);
@@ -1341,20 +1356,20 @@ document.getElementById('btnOpenSql').addEventListener('click', () => document.g
 document.getElementById('fileOpenSql').addEventListener('change', async (ev) => {
   const file = ev.target.files[0];
   if (!file) return;
-  const text = await file.text();
-  cm.setValue(text);
+  try {
+    const text = await file.text();
+    cm.setValue(text);
+  } catch (e) {
+    statusText.textContent = 'Could not read that file';
+    statusText.className = 'status err';
+  }
   ev.target.value = '';
 });
 
 document.getElementById('btnSaveDb').addEventListener('click', () => {
   if (!engineReady) return;
   const bytes = db.export();
-  const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'database.sqlite';
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(bytes, 'database.sqlite', 'application/x-sqlite3');
 });
 
 document.getElementById('btnOpenDb').addEventListener('click', () => document.getElementById('fileOpenDb').click());
@@ -1517,8 +1532,10 @@ function downloadBlob(content, filename, mime) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------- Mobile schema drawer ----------
@@ -1614,33 +1631,54 @@ document.getElementById('btnExplain').addEventListener('click', () => {
 // guided tutorial, an ER diagram, and shareable query links.
 // =====================================================================
 
-function showSessionBanner(msg) {
-  sessionBanner.style.display = 'flex';
-  sessionBanner.innerHTML = '';
-  const span = document.createElement('span');
-  span.textContent = msg;
-  const link = document.createElement('a');
-  link.textContent = 'Start fresh instead';
-  link.addEventListener('click', () => {
-    try { localStorage.removeItem(LS_SQL); localStorage.removeItem(LS_DB); } catch (e) {}
-    location.reload();
-  });
-  sessionBanner.appendChild(span);
-  sessionBanner.appendChild(link);
-}
-
-// Decides what goes in the editor on page load: an autosaved session if one
-// exists, otherwise the default boilerplate.
+// Decides what goes in the editor on page load. If there's a previous
+// session saved on this device, ask before touching it — restoring silently
+// is convenient until it isn't (e.g. it clobbers whatever the person typed
+// mid-thought before a refresh they didn't mean to do).
 function initSession() {
+  let savedSql = null, hasSavedDb = false;
   try {
-    const savedSql = localStorage.getItem(LS_SQL);
-    if (savedSql !== null) {
-      cm.setValue(savedSql);
-      showSessionBanner('Restored your last session.');
-      return;
-    }
-  } catch (e) { /* ignore a corrupted autosave */ }
-  cm.setValue(BOILERPLATE_SQL);
+    savedSql = localStorage.getItem(LS_SQL);
+    hasSavedDb = !!localStorage.getItem(LS_DB);
+  } catch (e) { /* localStorage unavailable — just start fresh below */ }
+
+  if (savedSql === null && !hasSavedDb) {
+    cm.setValue(BOILERPLATE_SQL);
+    initDB();
+    return;
+  }
+
+  modalTitle.textContent = 'Welcome back';
+  modalBody.innerHTML = `
+    <p style="color:var(--text-dim); font-size:13.5px; line-height:1.6; margin:0 0 16px;">
+      You have a session saved on this device from last time — your query and working database.
+      Pick up where you left off, or start with a clean slate.
+    </p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="primary" id="sessionRestoreBtn" style="flex:1;">Restore my previous session</button>
+      <button class="ghost" id="sessionFreshBtn" style="flex:1;">Start a new one</button>
+    </div>
+  `;
+  modalFoot.innerHTML = `
+    <span style="font-family:var(--sans); font-size:11.5px; color:var(--text-faint);">
+      KVSQL — made by <a href="https://github.com/asrbmy" target="_blank" rel="noopener" style="color:var(--teal);">ASRBMY</a>
+      · <a href="https://github.com/asrbmy/kvsql" target="_blank" rel="noopener" style="color:var(--teal);">GitHub repo</a>
+      · <a href="https://asrbmy.github.io/kvsql/" target="_blank" rel="noopener" style="color:var(--teal);">live site</a>
+    </span>
+  `;
+  openModal();
+
+  document.getElementById('sessionRestoreBtn').addEventListener('click', () => {
+    cm.setValue(savedSql !== null ? savedSql : BOILERPLATE_SQL);
+    closeModal();
+    initDB();
+  });
+  document.getElementById('sessionFreshBtn').addEventListener('click', () => {
+    try { localStorage.removeItem(LS_SQL); localStorage.removeItem(LS_DB); } catch (e) {}
+    cm.setValue(BOILERPLATE_SQL);
+    closeModal();
+    initDB();
+  });
 }
 
 // ---------- Autosave (debounced) ----------
