@@ -1587,9 +1587,13 @@ document.getElementById('btnExplain').addEventListener('click', () => {
   if (!sql) return;
   const first = splitStatements(sql)[0];
   if (!first) return;
+  registerCustomFunctions(db); // safety net, same as runQuery
   try {
-    const res = db.exec(`EXPLAIN QUERY PLAN ${first};`);
-    pushHistory(`EXPLAIN QUERY PLAN ${first}`, true);
+    const { sql: execFirst } = preprocessSql(first);
+    if (!execFirst) { statusText.textContent = 'Nothing to explain'; statusText.className = 'status'; return; }
+    const planSql = `EXPLAIN QUERY PLAN ${execFirst}`;
+    const res = db.exec(planSql);
+    pushHistory(planSql, true);
     if (!res.length) {
       resultsBody.innerHTML = '';
       const empty = document.createElement('div');
@@ -1625,12 +1629,7 @@ document.getElementById('btnExplain').addEventListener('click', () => {
   }
 });
 
-// =====================================================================
-// Everything below is additive: query tabs, autosave, snippets, sample
-// datasets, schema export, theme + dialect toggles, hover tooltips, a
-// guided tutorial, an ER diagram, and shareable query links.
-// =====================================================================
-
+// ---------- Session persistence and ER diagram ----------
 // Decides what goes in the editor on page load. If there's a previous
 // session saved on this device, ask before touching it — restoring silently
 // is convenient until it isn't (e.g. it clobbers whatever the person typed
@@ -1683,23 +1682,26 @@ function initSession() {
 
 // ---------- Autosave (debounced) ----------
 let autosaveTimer = null;
+function performAutosave() {
+  try {
+    localStorage.setItem(LS_SQL, cm.getValue());
+    if (db) {
+      const bytes = db.export();
+      if (bytes.length < 4 * 1024 * 1024) { // stay well under typical localStorage quotas
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        localStorage.setItem(LS_DB, btoa(binary));
+      }
+    }
+  } catch (e) { console.warn('Autosave failed', e); }
+}
 function autosaveSession() {
   clearTimeout(autosaveTimer);
-  autosaveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(LS_SQL, cm.getValue());
-      if (db) {
-        const bytes = db.export();
-        if (bytes.length < 4 * 1024 * 1024) { // stay well under typical localStorage quotas
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          localStorage.setItem(LS_DB, btoa(binary));
-        }
-      }
-    } catch (e) { console.warn('Autosave failed', e); }
-  }, 300);
+  autosaveTimer = setTimeout(performAutosave, 300);
 }
-window.addEventListener('beforeunload', autosaveSession);
+// A debounced save won't fire in time during page unload — the tab is gone
+// before the timer runs — so save synchronously and immediately here instead.
+window.addEventListener('beforeunload', () => { clearTimeout(autosaveTimer); performAutosave(); });
 
 // ---------- Generic modal ----------
 function openModal() { modalOverlay.classList.add('open'); }
